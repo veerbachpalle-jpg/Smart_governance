@@ -1,0 +1,7169 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "AI-Powered Municipal Grievance Intelligence & Accountability System",
+    "description": "Backend API for intelligent grievance triage, routing, and evidence-verified resolution.",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": [
+          "System"
+        ],
+        "summary": "Liveness probe",
+        "operationId": "health_check_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object",
+                  "title": "Response Health Check Health Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ready": {
+      "get": {
+        "tags": [
+          "System"
+        ],
+        "summary": "Readiness probe verifying database connectivity",
+        "operationId": "readiness_check_ready_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object",
+                  "title": "Response Readiness Check Ready Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/register": {
+      "post": {
+        "tags": [
+          "Identity & Auth"
+        ],
+        "summary": "Register a new citizen account",
+        "operationId": "register_citizen_api_v1_auth_register_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/login": {
+      "post": {
+        "tags": [
+          "Identity & Auth"
+        ],
+        "summary": "Authenticate user and obtain JWT tokens",
+        "operationId": "login_api_v1_auth_login_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/refresh": {
+      "post": {
+        "tags": [
+          "Identity & Auth"
+        ],
+        "summary": "Refresh access token using refresh token",
+        "operationId": "refresh_token_api_v1_auth_refresh_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefreshRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/users/me": {
+      "get": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "Get current authenticated user profile",
+        "operationId": "get_me_api_v1_users_me_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/users/officer-area": {
+      "get": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "Protected area restricted to officer and supervisor roles",
+        "operationId": "officer_area_api_v1_users_officer_area_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object",
+                  "title": "Response Officer Area Api V1 Users Officer Area Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/audit/events": {
+      "get": {
+        "tags": [
+          "Audit & Governance"
+        ],
+        "summary": "List immutable audit trail events with cursor pagination and filters",
+        "operationId": "list_audit_events_api_v1_audit_events_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "entity_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Entity Type"
+            }
+          },
+          {
+            "name": "entity_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Entity Id"
+            }
+          },
+          {
+            "name": "actor_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Actor Id"
+            }
+          },
+          {
+            "name": "action",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Action"
+            }
+          },
+          {
+            "name": "start_time",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Start Time"
+            }
+          },
+          {
+            "name": "end_time",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "End Time"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedResponse_AuditEventResponse_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/audit/verify": {
+      "get": {
+        "tags": [
+          "Audit & Governance"
+        ],
+        "summary": "Verify cryptographic integrity of the entire audit hash chain",
+        "operationId": "verify_audit_chain_api_v1_audit_verify_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditVerifyResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/complaints/{complaint_id}/duplicates": {
+      "get": {
+        "tags": [
+          "Duplicates"
+        ],
+        "summary": "Get ranked duplicate candidate incidents with spatial, semantic, and temporal breakdown",
+        "operationId": "get_duplicate_candidates_api_v1_complaints__complaint_id__duplicates_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "complaint_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Complaint Id"
+            }
+          },
+          {
+            "name": "radius_meters",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "maximum": 50000.0,
+              "minimum": 100.0,
+              "default": 3000.0,
+              "title": "Radius Meters"
+            }
+          },
+          {
+            "name": "time_window_days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 365,
+              "minimum": 1,
+              "default": 30,
+              "title": "Time Window Days"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DuplicateCandidateResponse"
+                  },
+                  "title": "Response Get Duplicate Candidates Api V1 Complaints  Complaint Id  Duplicates Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/complaints/{complaint_id}/duplicates/{candidate_id}/link": {
+      "post": {
+        "tags": [
+          "Duplicates"
+        ],
+        "summary": "Officer links candidate as a duplicate incident; recorded with audit trail without auto-merging",
+        "operationId": "link_duplicate_candidate_api_v1_complaints__complaint_id__duplicates__candidate_id__link_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "complaint_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Complaint Id"
+            }
+          },
+          {
+            "name": "candidate_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Candidate Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LinkDuplicateRequest",
+                "default": {}
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DuplicateCandidateResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/complaints/{complaint_id}/duplicates/{candidate_id}/dismiss": {
+      "post": {
+        "tags": [
+          "Duplicates"
+        ],
+        "summary": "Officer dismisses duplicate candidate with mandatory justification",
+        "operationId": "dismiss_duplicate_candidate_api_v1_complaints__complaint_id__duplicates__candidate_id__dismiss_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "complaint_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Complaint Id"
+            }
+          },
+          {
+            "name": "candidate_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Candidate Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DismissDuplicateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DuplicateCandidateResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/complaints/nearby-similar": {
+      "get": {
+        "tags": [
+          "Duplicates"
+        ],
+        "summary": "Citizen-facing search returning limited, non-sensitive nearby reports",
+        "operationId": "get_nearby_similar_reports_api_v1_complaints_nearby_similar_get",
+        "parameters": [
+          {
+            "name": "latitude",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "number",
+              "maximum": 90.0,
+              "minimum": -90.0,
+              "title": "Latitude"
+            }
+          },
+          {
+            "name": "longitude",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "number",
+              "maximum": 180.0,
+              "minimum": -180.0,
+              "title": "Longitude"
+            }
+          },
+          {
+            "name": "radius_meters",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "maximum": 20000.0,
+              "minimum": 50.0,
+              "default": 2000.0,
+              "title": "Radius Meters"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/NearbySimilarReport"
+                  },
+                  "title": "Response Get Nearby Similar Reports Api V1 Complaints Nearby Similar Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/complaints/{complaint_id}/support": {
+      "post": {
+        "tags": [
+          "Duplicates"
+        ],
+        "summary": "Citizen clicks 'This is the same issue' to add endorsement to existing complaint",
+        "operationId": "support_complaint_api_v1_complaints__complaint_id__support_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "complaint_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Complaint Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupportComplaintResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/complaints": {
+      "post": {
+        "tags": [
+          "Complaints"
+        ],
+        "summary": "Submit a new municipal grievance with mandatory Idempotency-Key",
+        "operationId": "submit_complaint_api_v1_complaints_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateComplaintRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ComplaintResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Complaints"
+        ],
+        "summary": "List complaints (citizens view only own; municipal staff view all with filters)",
+        "operationId": "list_complaints_api_v1_complaints_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "name": "ward_name",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Ward Name"
+            }
+          },
+          {
+            "name": "start_time",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Start Time"
+            }
+          },
+          {
+            "name": "end_time",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "End Time"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedResponse_ComplaintResponse_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/complaints/{complaint_id}": {
+      "get": {
+        "tags": [
+          "Complaints"
+        ],
+        "summary": "Get comprehensive complaint dossier with authorization check",
+        "operationId": "get_complaint_detail_api_v1_complaints__complaint_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "complaint_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Complaint Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ComplaintResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/complaints/{identifier}/tracking": {
+      "get": {
+        "tags": [
+          "Complaints"
+        ],
+        "summary": "Public-safe status tracking by complaint ID or tracking number without personal data",
+        "operationId": "get_public_tracking_api_v1_complaints__identifier__tracking_get",
+        "parameters": [
+          {
+            "name": "identifier",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Identifier"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicTrackingResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/complaints/attachments/upload": {
+      "post": {
+        "tags": [
+          "Complaints"
+        ],
+        "summary": "Upload media attachment (validates MIME, size, rejects executables)",
+        "operationId": "upload_attachment_api_v1_complaints_attachments_upload_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_attachment_api_v1_complaints_attachments_upload_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttachmentResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/complaints/{complaint_id}/attachments": {
+      "get": {
+        "tags": [
+          "Complaints"
+        ],
+        "summary": "List all media attachments associated with a complaint",
+        "operationId": "get_complaint_attachments_api_v1_complaints__complaint_id__attachments_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "complaint_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Complaint Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AttachmentResponse"
+                  },
+                  "title": "Response Get Complaint Attachments Api V1 Complaints  Complaint Id  Attachments Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/complaints/{complaint_id}/ai-interpretation": {
+      "get": {
+        "tags": [
+          "AI Assist"
+        ],
+        "summary": "Get latest AI triage recommendation for a complaint",
+        "operationId": "get_complaint_ai_interpretation_api_v1_complaints__complaint_id__ai_interpretation_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "complaint_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Complaint Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AIInterpretationResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/complaints/{complaint_id}/ai-interpretation/accept": {
+      "post": {
+        "tags": [
+          "AI Assist"
+        ],
+        "summary": "Officer accepts AI triage recommendation",
+        "operationId": "accept_ai_interpretation_api_v1_complaints__complaint_id__ai_interpretation_accept_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "complaint_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Complaint Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AcceptInterpretationRequest",
+                "default": {}
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AIInterpretationResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/complaints/{complaint_id}/ai-interpretation/override": {
+      "post": {
+        "tags": [
+          "AI Assist"
+        ],
+        "summary": "Officer overrides AI triage recommendation with mandatory reason",
+        "operationId": "override_ai_interpretation_api_v1_complaints__complaint_id__ai_interpretation_override_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "complaint_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Complaint Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OverrideInterpretationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AIInterpretationResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/complaints/{complaint_id}/ai-interpretation/reject": {
+      "post": {
+        "tags": [
+          "AI Assist"
+        ],
+        "summary": "Officer rejects AI triage recommendation with mandatory reason",
+        "operationId": "reject_ai_interpretation_api_v1_complaints__complaint_id__ai_interpretation_reject_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "complaint_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Complaint Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RejectInterpretationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AIInterpretationResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/routing/rules": {
+      "post": {
+        "tags": [
+          "Routing"
+        ],
+        "summary": "Admin creates a new versioned routing rule",
+        "operationId": "create_routing_rule_api_v1_routing_rules_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RoutingRuleCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoutingRuleResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Routing"
+        ],
+        "summary": "List all versioned routing rules with optional category and status filtering",
+        "operationId": "list_routing_rules_api_v1_routing_rules_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "category",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Category"
+            }
+          },
+          {
+            "name": "is_active",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Is Active"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/RoutingRuleResponse"
+                  },
+                  "title": "Response List Routing Rules Api V1 Routing Rules Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/routing/rules/{rule_id}": {
+      "put": {
+        "tags": [
+          "Routing"
+        ],
+        "summary": "Admin updates an existing routing rule",
+        "operationId": "update_routing_rule_api_v1_routing_rules__rule_id__put",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "rule_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Rule Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RoutingRuleUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoutingRuleResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/complaints/{complaint_id}/routing": {
+      "get": {
+        "tags": [
+          "Routing"
+        ],
+        "summary": "Get top-3 department routing recommendations for a complaint",
+        "operationId": "get_complaint_routing_api_v1_complaints__complaint_id__routing_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "complaint_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Complaint Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoutingRecommendationResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/complaints/{complaint_id}/routing/accept": {
+      "post": {
+        "tags": [
+          "Routing"
+        ],
+        "summary": "Officer accepts routing recommendation; complaint moves to ROUTED",
+        "operationId": "accept_complaint_routing_api_v1_complaints__complaint_id__routing_accept_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "complaint_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Complaint Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AcceptRoutingRequest",
+                "default": {}
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoutingRecommendationResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/complaints/{complaint_id}/routing/override": {
+      "post": {
+        "tags": [
+          "Routing"
+        ],
+        "summary": "Officer overrides routing recommendation with mandatory reason; complaint moves to ROUTED",
+        "operationId": "override_complaint_routing_api_v1_complaints__complaint_id__routing_override_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "complaint_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Complaint Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OverrideRoutingRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoutingRecommendationResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/complaints/{complaint_id}/routing/reject": {
+      "post": {
+        "tags": [
+          "Routing"
+        ],
+        "summary": "Officer rejects routing recommendation with mandatory reason",
+        "operationId": "reject_complaint_routing_api_v1_complaints__complaint_id__routing_reject_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "complaint_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Complaint Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RejectRoutingRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoutingRecommendationResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/priority/policies": {
+      "get": {
+        "tags": [
+          "Priority"
+        ],
+        "summary": "List all priority policies",
+        "operationId": "list_priority_policies_api_v1_priority_policies_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PriorityPolicyResponse"
+                  },
+                  "type": "array",
+                  "title": "Response List Priority Policies Api V1 Priority Policies Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Priority"
+        ],
+        "summary": "Admin creates a multilingual safety priority policy",
+        "operationId": "create_priority_policy_api_v1_priority_policies_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PriorityPolicyCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PriorityPolicyResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/complaints/{complaint_id}/priority": {
+      "get": {
+        "tags": [
+          "Priority"
+        ],
+        "summary": "Get or generate priority assessment for a complaint",
+        "operationId": "get_complaint_priority_api_v1_complaints__complaint_id__priority_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "complaint_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Complaint Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PriorityAssessmentResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/complaints/{complaint_id}/priority/accept": {
+      "post": {
+        "tags": [
+          "Priority"
+        ],
+        "summary": "Officer accepts suggested priority recommendation",
+        "operationId": "accept_complaint_priority_api_v1_complaints__complaint_id__priority_accept_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "complaint_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Complaint Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AcceptPriorityRequest",
+                "default": {}
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PriorityAssessmentResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/complaints/{complaint_id}/priority/override": {
+      "post": {
+        "tags": [
+          "Priority"
+        ],
+        "summary": "Officer overrides priority with mandatory justification",
+        "operationId": "override_complaint_priority_api_v1_complaints__complaint_id__priority_override_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "complaint_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Complaint Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OverridePriorityRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PriorityAssessmentResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/complaints/{complaint_id}/priority/reject": {
+      "post": {
+        "tags": [
+          "Priority"
+        ],
+        "summary": "Officer rejects priority recommendation with mandatory justification",
+        "operationId": "reject_complaint_priority_api_v1_complaints__complaint_id__priority_reject_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "complaint_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Complaint Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RejectPriorityRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PriorityAssessmentResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/priority/queue": {
+      "get": {
+        "tags": [
+          "Priority"
+        ],
+        "summary": "Safety-critical grievance queue flagged for expedited triage",
+        "operationId": "get_critical_priority_queue_api_v1_priority_queue_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PriorityQueueItem"
+                  },
+                  "type": "array",
+                  "title": "Response Get Critical Priority Queue Api V1 Priority Queue Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/cases/{case_id}/activity": {
+      "post": {
+        "tags": [
+          "Case Activity"
+        ],
+        "summary": "Append an official activity log entry to the case",
+        "operationId": "add_activity_api_v1_cases__case_id__activity_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Case Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddActivityRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseActivityResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/cases/{case_id}/activities": {
+      "get": {
+        "tags": [
+          "Case Activity"
+        ],
+        "summary": "Get official activity history for staff (includes internal and citizen-visible entries)",
+        "operationId": "list_case_activities_api_v1_cases__case_id__activities_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Case Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CaseActivityResponse"
+                  },
+                  "title": "Response List Case Activities Api V1 Cases  Case Id  Activities Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/cases/{case_id}/citizen-updates": {
+      "post": {
+        "tags": [
+          "Case Activity"
+        ],
+        "summary": "Publish an official citizen-visible update message for public tracking",
+        "operationId": "publish_citizen_update_api_v1_cases__case_id__citizen_updates_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Case Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CitizenUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseActivityResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/cases/citizen-timeline/{complaint_id}": {
+      "get": {
+        "tags": [
+          "Case Activity"
+        ],
+        "summary": "Citizen timeline showing ONLY CITIZEN_VISIBLE entries for their grievance",
+        "operationId": "get_citizen_timeline_api_v1_cases_citizen_timeline__complaint_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "complaint_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Complaint Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CitizenTimelineItem"
+                  },
+                  "title": "Response Get Citizen Timeline Api V1 Cases Citizen Timeline  Complaint Id  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/cases": {
+      "post": {
+        "tags": [
+          "Cases"
+        ],
+        "summary": "Create a new case grouping one or more complaints",
+        "operationId": "create_case_api_v1_cases_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCaseRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/cases/{case_id}": {
+      "get": {
+        "tags": [
+          "Cases"
+        ],
+        "summary": "Get case dossier with departments and linked complaints",
+        "operationId": "get_case_api_v1_cases__case_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Case Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/cases/{case_id}/complaints": {
+      "post": {
+        "tags": [
+          "Cases"
+        ],
+        "summary": "Link an additional complaint to this case",
+        "operationId": "link_complaint_api_v1_cases__case_id__complaints_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Case Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LinkComplaintRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/cases/{case_id}/departments": {
+      "post": {
+        "tags": [
+          "Cases"
+        ],
+        "summary": "Add a department to this case",
+        "operationId": "add_department_api_v1_cases__case_id__departments_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Case Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddDepartmentRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/cases/{case_id}/lead": {
+      "put": {
+        "tags": [
+          "Cases"
+        ],
+        "summary": "Set the single accountable lead department for the case",
+        "operationId": "set_lead_department_api_v1_cases__case_id__lead_put",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Case Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetLeadDepartmentRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/cases/{case_id}/transition": {
+      "post": {
+        "tags": [
+          "Cases"
+        ],
+        "summary": "Transition case status through central state machine",
+        "operationId": "transition_case_api_v1_cases__case_id__transition_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Case Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TransitionCaseRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/cases/{case_id}/assign": {
+      "post": {
+        "tags": [
+          "Cases"
+        ],
+        "summary": "Assign an officer to the case; advances ACCEPTED_BY_LEAD to IN_PROGRESS",
+        "operationId": "assign_officer_api_v1_cases__case_id__assign_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Case Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssignOfficerRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/cases/{case_id}/reassign": {
+      "post": {
+        "tags": [
+          "Cases"
+        ],
+        "summary": "Request case reassignment with mandatory justification",
+        "operationId": "request_reassignment_api_v1_cases__case_id__reassign_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Case Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReassignCaseRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/cases/{case_id}/resolve": {
+      "post": {
+        "tags": [
+          "Resolutions & Citizen Challenges"
+        ],
+        "summary": "Officer submits formal resolution proposal with mandatory evidence attachments",
+        "operationId": "propose_resolution_api_v1_cases__case_id__resolve_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Case Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProposeResolutionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResolutionProposalResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/cases/{case_id}/proposal": {
+      "get": {
+        "tags": [
+          "Resolutions & Citizen Challenges"
+        ],
+        "summary": "Get latest resolution proposal and verification evidence for a case",
+        "operationId": "get_latest_proposal_api_v1_cases__case_id__proposal_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Case Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResolutionProposalResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/cases/{case_id}/confirm": {
+      "post": {
+        "tags": [
+          "Resolutions & Citizen Challenges"
+        ],
+        "summary": "Citizen confirms resolution satisfaction, permanently closing the case",
+        "operationId": "confirm_resolution_api_v1_cases__case_id__confirm_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Case Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfirmResolutionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/cases/{case_id}/challenge": {
+      "post": {
+        "tags": [
+          "Resolutions & Citizen Challenges"
+        ],
+        "summary": "Citizen files a formal challenge against resolution, rejection, action, or priority",
+        "operationId": "file_challenge_api_v1_cases__case_id__challenge_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Case Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CitizenChallengeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CitizenChallengeResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Resolutions & Citizen Challenges"
+        ],
+        "summary": "Citizen queries the status of the challenge filed for a case",
+        "operationId": "get_challenge_status_api_v1_cases__case_id__challenge_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Case Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CitizenChallengeResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/challenges/queue": {
+      "get": {
+        "tags": [
+          "Resolutions & Citizen Challenges"
+        ],
+        "summary": "Staff review queue for citizen disputes",
+        "operationId": "list_challenge_queue_api_v1_challenges_queue_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CitizenChallengeResponse"
+                  },
+                  "title": "Response List Challenge Queue Api V1 Challenges Queue Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/challenges/{challenge_id}": {
+      "get": {
+        "tags": [
+          "Resolutions & Citizen Challenges"
+        ],
+        "summary": "Get challenge details by ID",
+        "operationId": "get_challenge_by_id_api_v1_challenges__challenge_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "challenge_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Challenge Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CitizenChallengeResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/challenges/{challenge_id}/review": {
+      "post": {
+        "tags": [
+          "Resolutions & Citizen Challenges"
+        ],
+        "summary": "Independent supervisor review decision (strictly blocks self-review)",
+        "operationId": "review_challenge_api_v1_challenges__challenge_id__review_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "challenge_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Challenge Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChallengeReviewRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CitizenChallengeResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/challenges/worker/sla-escalations": {
+      "post": {
+        "tags": [
+          "Resolutions & Citizen Challenges"
+        ],
+        "summary": "Worker job trigger: Escalate overdue challenges to supervisor queue",
+        "operationId": "trigger_sla_escalations_api_v1_challenges_worker_sla_escalations_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "type": "array",
+                  "title": "Response Trigger Sla Escalations Api V1 Challenges Worker Sla Escalations Post"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/cases/worker/expire-review-windows": {
+      "post": {
+        "tags": [
+          "Resolutions & Citizen Challenges"
+        ],
+        "summary": "Worker job trigger: Auto-close cases where review window expired with no challenge",
+        "operationId": "trigger_review_window_expiry_api_v1_cases_worker_expire_review_windows_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "type": "array",
+                  "title": "Response Trigger Review Window Expiry Api V1 Cases Worker Expire Review Windows Post"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/triage/manual/queue": {
+      "get": {
+        "tags": [
+          "Manual Triage"
+        ],
+        "summary": "List complaints in the MANUAL_TRIAGE queue waiting for officer assessment",
+        "operationId": "get_manual_triage_queue_api_v1_triage_manual_queue_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ManualTriageQueueItemResponse"
+                  },
+                  "type": "array",
+                  "title": "Response Get Manual Triage Queue Api V1 Triage Manual Queue Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/triage/manual/{complaint_id}": {
+      "post": {
+        "tags": [
+          "Manual Triage"
+        ],
+        "summary": "Officer manually assigns category, routing, and priority (no AI required)",
+        "operationId": "submit_manual_triage_api_v1_triage_manual__complaint_id__post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "complaint_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Complaint Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ManualTriageRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManualTriageResultResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/chaos": {
+      "get": {
+        "tags": [
+          "Admin Chaos Simulation"
+        ],
+        "summary": "Get active chaos engineering simulation state (used by UI for banner)",
+        "operationId": "get_chaos_state_api_v1_admin_chaos_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChaosStateResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Admin Chaos Simulation"
+        ],
+        "summary": "Configure active chaos simulation parameters (admin-only, non-production only)",
+        "operationId": "configure_chaos_api_v1_admin_chaos_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChaosConfigRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChaosStateResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/chaos/reset": {
+      "post": {
+        "tags": [
+          "Admin Chaos Simulation"
+        ],
+        "summary": "Reset all chaos simulations to normal/inactive state",
+        "operationId": "reset_chaos_api_v1_admin_chaos_reset_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChaosStateResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/eval/runs": {
+      "get": {
+        "tags": [
+          "Evaluation Harness"
+        ],
+        "summary": "List all evaluation benchmark runs (Admin/Auditor only)",
+        "operationId": "list_eval_runs_api_v1_eval_runs_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/EvalRunSummary"
+                  },
+                  "title": "Response List Eval Runs Api V1 Eval Runs Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/eval/runs/{id}": {
+      "get": {
+        "tags": [
+          "Evaluation Harness"
+        ],
+        "summary": "Get detailed evaluation run metrics including confusion matrices and false negatives (Admin/Auditor only)",
+        "operationId": "get_eval_run_detail_api_v1_eval_runs__id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvalRunDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AIInterpretationResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "complaint_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Complaint Id"
+          },
+          "model": {
+            "type": "string",
+            "title": "Model"
+          },
+          "prompt_version": {
+            "type": "string",
+            "title": "Prompt Version"
+          },
+          "input_hash": {
+            "type": "string",
+            "title": "Input Hash"
+          },
+          "raw_output": {
+            "type": "string",
+            "title": "Raw Output"
+          },
+          "parsed_output": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Parsed Output"
+          },
+          "confidence": {
+            "type": "number",
+            "title": "Confidence"
+          },
+          "latency_ms": {
+            "type": "integer",
+            "title": "Latency Ms"
+          },
+          "recommendation_status": {
+            "type": "string",
+            "title": "Recommendation Status"
+          },
+          "decided_by_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decided By Id"
+          },
+          "decision_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decision Reason"
+          },
+          "decided_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decided At"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "complaint_id",
+          "model",
+          "prompt_version",
+          "input_hash",
+          "raw_output",
+          "parsed_output",
+          "confidence",
+          "latency_ms",
+          "recommendation_status",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "AIInterpretationResponse",
+        "description": "Public schema representing a stored AI recommendation record."
+      },
+      "AcceptInterpretationRequest": {
+        "properties": {
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          }
+        },
+        "type": "object",
+        "title": "AcceptInterpretationRequest",
+        "description": "Officer accepts the AI recommendation."
+      },
+      "AcceptPriorityRequest": {
+        "properties": {
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          }
+        },
+        "type": "object",
+        "title": "AcceptPriorityRequest"
+      },
+      "AcceptRoutingRequest": {
+        "properties": {
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          }
+        },
+        "type": "object",
+        "title": "AcceptRoutingRequest"
+      },
+      "AddActivityRequest": {
+        "properties": {
+          "activity_type": {
+            "type": "string",
+            "maxLength": 64,
+            "title": "Activity Type",
+            "default": "NOTE_ADDED"
+          },
+          "visibility": {
+            "type": "string",
+            "pattern": "^(INTERNAL|CITIZEN_VISIBLE)$",
+            "title": "Visibility",
+            "default": "INTERNAL"
+          },
+          "message": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 2,
+            "title": "Message"
+          },
+          "metadata": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metadata"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message"
+        ],
+        "title": "AddActivityRequest"
+      },
+      "AddDepartmentRequest": {
+        "properties": {
+          "department_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Department Id"
+          },
+          "is_lead": {
+            "type": "boolean",
+            "title": "Is Lead",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "department_id"
+        ],
+        "title": "AddDepartmentRequest"
+      },
+      "AssignOfficerRequest": {
+        "properties": {
+          "officer_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Officer Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "officer_id"
+        ],
+        "title": "AssignOfficerRequest"
+      },
+      "AttachmentResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "file_url": {
+            "type": "string",
+            "title": "File Url"
+          },
+          "file_name": {
+            "type": "string",
+            "title": "File Name"
+          },
+          "mime_type": {
+            "type": "string",
+            "title": "Mime Type"
+          },
+          "file_size_bytes": {
+            "type": "integer",
+            "title": "File Size Bytes"
+          },
+          "sha256_hash": {
+            "type": "string",
+            "title": "Sha256 Hash"
+          },
+          "attachment_type": {
+            "type": "string",
+            "title": "Attachment Type"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "file_url",
+          "file_name",
+          "mime_type",
+          "file_size_bytes",
+          "sha256_hash",
+          "attachment_type",
+          "created_at"
+        ],
+        "title": "AttachmentResponse"
+      },
+      "AuditEventResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "sequence_number": {
+            "type": "integer",
+            "title": "Sequence Number"
+          },
+          "entity_type": {
+            "type": "string",
+            "title": "Entity Type"
+          },
+          "entity_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Entity Id"
+          },
+          "action": {
+            "type": "string",
+            "title": "Action"
+          },
+          "actor_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actor Id"
+          },
+          "actor_role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actor Role"
+          },
+          "ip_address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ip Address"
+          },
+          "user_agent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Agent"
+          },
+          "old_state": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Old State"
+          },
+          "new_state": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "New State"
+          },
+          "occurred_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Occurred At"
+          },
+          "previous_hash": {
+            "type": "string",
+            "title": "Previous Hash"
+          },
+          "current_hash": {
+            "type": "string",
+            "title": "Current Hash"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "sequence_number",
+          "entity_type",
+          "entity_id",
+          "action",
+          "occurred_at",
+          "previous_hash",
+          "current_hash"
+        ],
+        "title": "AuditEventResponse"
+      },
+      "AuditVerifyResponse": {
+        "properties": {
+          "is_valid": {
+            "type": "boolean",
+            "title": "Is Valid"
+          },
+          "total_events": {
+            "type": "integer",
+            "title": "Total Events",
+            "default": 0
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "default": "Audit chain integrity verified."
+          },
+          "broken_at_sequence": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Broken At Sequence"
+          },
+          "event_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Event Id"
+          },
+          "expected_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Hash"
+          },
+          "actual_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actual Hash"
+          }
+        },
+        "type": "object",
+        "required": [
+          "is_valid"
+        ],
+        "title": "AuditVerifyResponse"
+      },
+      "Body_upload_attachment_api_v1_complaints_attachments_upload_post": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "File"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file"
+        ],
+        "title": "Body_upload_attachment_api_v1_complaints_attachments_upload_post"
+      },
+      "CalibrationBucket": {
+        "properties": {
+          "bucket_range": {
+            "type": "string",
+            "title": "Bucket Range"
+          },
+          "sample_count": {
+            "type": "integer",
+            "title": "Sample Count"
+          },
+          "mean_confidence": {
+            "type": "number",
+            "title": "Mean Confidence"
+          },
+          "accuracy": {
+            "type": "number",
+            "title": "Accuracy"
+          },
+          "calibration_error": {
+            "type": "number",
+            "title": "Calibration Error"
+          }
+        },
+        "type": "object",
+        "required": [
+          "bucket_range",
+          "sample_count",
+          "mean_confidence",
+          "accuracy",
+          "calibration_error"
+        ],
+        "title": "CalibrationBucket"
+      },
+      "CaseActivityResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "case_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Case Id"
+          },
+          "activity_type": {
+            "type": "string",
+            "title": "Activity Type"
+          },
+          "visibility": {
+            "type": "string",
+            "title": "Visibility"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "activity_metadata": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Activity Metadata"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "case_id",
+          "activity_type",
+          "visibility",
+          "message",
+          "created_at",
+          "activity_metadata"
+        ],
+        "title": "CaseActivityResponse"
+      },
+      "CaseDepartmentResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "department_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Department Id"
+          },
+          "department_name": {
+            "type": "string",
+            "title": "Department Name"
+          },
+          "is_lead": {
+            "type": "boolean",
+            "title": "Is Lead"
+          },
+          "added_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Added At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "department_id",
+          "department_name",
+          "is_lead",
+          "added_at"
+        ],
+        "title": "CaseDepartmentResponse"
+      },
+      "CaseResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "case_number": {
+            "type": "string",
+            "title": "Case Number"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "priority": {
+            "type": "string",
+            "title": "Priority"
+          },
+          "lead_department_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lead Department Id"
+          },
+          "assigned_officer_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assigned Officer Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "departments": {
+            "items": {
+              "$ref": "#/components/schemas/CaseDepartmentResponse"
+            },
+            "type": "array",
+            "title": "Departments",
+            "default": []
+          },
+          "complaint_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Complaint Ids",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "case_number",
+          "title",
+          "description",
+          "status",
+          "priority",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "CaseResponse"
+      },
+      "ChallengeReviewRequest": {
+        "properties": {
+          "verdict": {
+            "type": "string",
+            "pattern": "^(UPHELD|OVERTURNED)$",
+            "title": "Verdict",
+            "description": "UPHELD (citizen dispute valid -> reopens case) or OVERTURNED (challenge dismissed -> closes case)"
+          },
+          "rationale": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 5,
+            "title": "Rationale",
+            "description": "Mandatory written justification for review decision"
+          },
+          "action_taken": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Action Taken"
+          }
+        },
+        "type": "object",
+        "required": [
+          "verdict",
+          "rationale"
+        ],
+        "title": "ChallengeReviewRequest"
+      },
+      "ChallengeReviewResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "challenge_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Challenge Id"
+          },
+          "reviewer_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Reviewer Id"
+          },
+          "verdict": {
+            "type": "string",
+            "title": "Verdict"
+          },
+          "rationale": {
+            "type": "string",
+            "title": "Rationale"
+          },
+          "action_taken": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Action Taken"
+          },
+          "reviewed_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Reviewed At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "challenge_id",
+          "reviewer_id",
+          "verdict",
+          "rationale",
+          "reviewed_at"
+        ],
+        "title": "ChallengeReviewResponse"
+      },
+      "ChaosConfigRequest": {
+        "properties": {
+          "disable_ai": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Disable Ai"
+          },
+          "ai_garbage": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ai Garbage"
+          },
+          "delay_worker_ms": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 60000.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delay Worker Ms"
+          },
+          "stop_worker": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stop Worker"
+          },
+          "fail_notifications": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fail Notifications"
+          },
+          "db_error_operations": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Db Error Operations"
+          }
+        },
+        "type": "object",
+        "title": "ChaosConfigRequest"
+      },
+      "ChaosStateResponse": {
+        "properties": {
+          "is_active": {
+            "type": "boolean",
+            "title": "Is Active"
+          },
+          "disable_ai": {
+            "type": "boolean",
+            "title": "Disable Ai"
+          },
+          "ai_garbage": {
+            "type": "boolean",
+            "title": "Ai Garbage"
+          },
+          "delay_worker_ms": {
+            "type": "integer",
+            "title": "Delay Worker Ms"
+          },
+          "stop_worker": {
+            "type": "boolean",
+            "title": "Stop Worker"
+          },
+          "fail_notifications": {
+            "type": "boolean",
+            "title": "Fail Notifications"
+          },
+          "db_error_operations": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Db Error Operations"
+          }
+        },
+        "type": "object",
+        "required": [
+          "is_active",
+          "disable_ai",
+          "ai_garbage",
+          "delay_worker_ms",
+          "stop_worker",
+          "fail_notifications",
+          "db_error_operations"
+        ],
+        "title": "ChaosStateResponse"
+      },
+      "CitizenChallengeRequest": {
+        "properties": {
+          "challenge_type": {
+            "type": "string",
+            "pattern": "^(RESOLUTION|REJECTION|OFFICIAL_ACTION|PRIORITY)$",
+            "title": "Challenge Type",
+            "default": "RESOLUTION"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 5,
+            "title": "Reason",
+            "description": "Mandatory justification for contesting official action or resolution"
+          },
+          "attachment_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Attachment Ids"
+          }
+        },
+        "type": "object",
+        "required": [
+          "reason"
+        ],
+        "title": "CitizenChallengeRequest"
+      },
+      "CitizenChallengeResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "case_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Case Id"
+          },
+          "resolution_proposal_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resolution Proposal Id"
+          },
+          "citizen_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Citizen Id"
+          },
+          "challenge_type": {
+            "type": "string",
+            "title": "Challenge Type"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "sla_expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Sla Expires At"
+          },
+          "is_escalated": {
+            "type": "boolean",
+            "title": "Is Escalated"
+          },
+          "escalated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Escalated At"
+          },
+          "review": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ChallengeReviewResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "case_id",
+          "citizen_id",
+          "challenge_type",
+          "reason",
+          "status",
+          "sla_expires_at",
+          "is_escalated",
+          "created_at"
+        ],
+        "title": "CitizenChallengeResponse"
+      },
+      "CitizenProfileResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "full_name": {
+            "type": "string",
+            "title": "Full Name"
+          },
+          "address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Address"
+          },
+          "preferred_language": {
+            "type": "string",
+            "title": "Preferred Language"
+          },
+          "notification_preference": {
+            "type": "string",
+            "title": "Notification Preference"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "full_name",
+          "preferred_language",
+          "notification_preference",
+          "created_at"
+        ],
+        "title": "CitizenProfileResponse"
+      },
+      "CitizenTimelineItem": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "time": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Time"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "department": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "activity_type": {
+            "type": "string",
+            "title": "Activity Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "time",
+          "status",
+          "message",
+          "activity_type"
+        ],
+        "title": "CitizenTimelineItem"
+      },
+      "CitizenUpdateRequest": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 2,
+            "title": "Title"
+          },
+          "message": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 2,
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "title",
+          "message"
+        ],
+        "title": "CitizenUpdateRequest"
+      },
+      "ComplaintResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "tracking_number": {
+            "type": "string",
+            "title": "Tracking Number"
+          },
+          "citizen_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Citizen Id"
+          },
+          "original_title": {
+            "type": "string",
+            "title": "Original Title"
+          },
+          "original_description": {
+            "type": "string",
+            "title": "Original Description"
+          },
+          "original_language": {
+            "type": "string",
+            "title": "Original Language"
+          },
+          "translated_title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Translated Title"
+          },
+          "translated_description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Translated Description"
+          },
+          "latitude": {
+            "type": "number",
+            "title": "Latitude"
+          },
+          "longitude": {
+            "type": "number",
+            "title": "Longitude"
+          },
+          "address": {
+            "type": "string",
+            "title": "Address"
+          },
+          "ward_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ward Id"
+          },
+          "ward_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ward Name"
+          },
+          "channel": {
+            "type": "string",
+            "title": "Channel"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "attachments": {
+            "items": {
+              "$ref": "#/components/schemas/AttachmentResponse"
+            },
+            "type": "array",
+            "title": "Attachments"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "tracking_number",
+          "citizen_id",
+          "original_title",
+          "original_description",
+          "original_language",
+          "latitude",
+          "longitude",
+          "address",
+          "channel",
+          "status",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "ComplaintResponse"
+      },
+      "ConfirmResolutionRequest": {
+        "properties": {
+          "feedback": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Feedback"
+          }
+        },
+        "type": "object",
+        "title": "ConfirmResolutionRequest"
+      },
+      "CreateCaseRequest": {
+        "properties": {
+          "complaint_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Complaint Id"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          }
+        },
+        "type": "object",
+        "required": [
+          "complaint_id"
+        ],
+        "title": "CreateCaseRequest"
+      },
+      "CreateComplaintRequest": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 3,
+            "title": "Title"
+          },
+          "description": {
+            "type": "string",
+            "minLength": 10,
+            "title": "Description"
+          },
+          "original_language": {
+            "type": "string",
+            "maxLength": 16,
+            "title": "Original Language",
+            "default": "en"
+          },
+          "latitude": {
+            "type": "number",
+            "maximum": 90.0,
+            "minimum": -90.0,
+            "title": "Latitude"
+          },
+          "longitude": {
+            "type": "number",
+            "maximum": 180.0,
+            "minimum": -180.0,
+            "title": "Longitude"
+          },
+          "address": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 3,
+            "title": "Address"
+          },
+          "channel": {
+            "type": "string",
+            "maxLength": 32,
+            "title": "Channel",
+            "default": "WEB"
+          },
+          "attachment_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Attachment Ids"
+          }
+        },
+        "type": "object",
+        "required": [
+          "title",
+          "description",
+          "latitude",
+          "longitude",
+          "address"
+        ],
+        "title": "CreateComplaintRequest"
+      },
+      "DismissDuplicateRequest": {
+        "properties": {
+          "reason": {
+            "type": "string",
+            "maxLength": 1000,
+            "minLength": 5,
+            "title": "Reason",
+            "description": "Mandatory reason for dismissing duplicate candidate"
+          }
+        },
+        "type": "object",
+        "required": [
+          "reason"
+        ],
+        "title": "DismissDuplicateRequest"
+      },
+      "DuplicateCandidateResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "complaint_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Complaint Id"
+          },
+          "candidate_complaint_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Candidate Complaint Id"
+          },
+          "candidate_tracking_number": {
+            "type": "string",
+            "title": "Candidate Tracking Number"
+          },
+          "candidate_title": {
+            "type": "string",
+            "title": "Candidate Title"
+          },
+          "candidate_status": {
+            "type": "string",
+            "title": "Candidate Status"
+          },
+          "overall_score": {
+            "type": "number",
+            "title": "Overall Score"
+          },
+          "geo_similarity": {
+            "type": "number",
+            "title": "Geo Similarity"
+          },
+          "semantic_similarity": {
+            "type": "number",
+            "title": "Semantic Similarity"
+          },
+          "category_similarity": {
+            "type": "number",
+            "title": "Category Similarity"
+          },
+          "time_similarity": {
+            "type": "number",
+            "title": "Time Similarity"
+          },
+          "distance_meters": {
+            "type": "number",
+            "title": "Distance Meters"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "decided_by_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decided By Id"
+          },
+          "decision_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decision Reason"
+          },
+          "decided_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decided At"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "complaint_id",
+          "candidate_complaint_id",
+          "candidate_tracking_number",
+          "candidate_title",
+          "candidate_status",
+          "overall_score",
+          "geo_similarity",
+          "semantic_similarity",
+          "category_similarity",
+          "time_similarity",
+          "distance_meters",
+          "status",
+          "created_at"
+        ],
+        "title": "DuplicateCandidateResponse"
+      },
+      "DuplicateMetrics": {
+        "properties": {
+          "precision_at_k": {
+            "type": "number",
+            "title": "Precision At K"
+          },
+          "recall_at_k": {
+            "type": "number",
+            "title": "Recall At K"
+          },
+          "k": {
+            "type": "integer",
+            "title": "K",
+            "default": 3
+          },
+          "evaluated_duplicate_samples": {
+            "type": "integer",
+            "title": "Evaluated Duplicate Samples"
+          }
+        },
+        "type": "object",
+        "required": [
+          "precision_at_k",
+          "recall_at_k",
+          "evaluated_duplicate_samples"
+        ],
+        "title": "DuplicateMetrics"
+      },
+      "EvalResultDetail": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "run_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Run Id"
+          },
+          "metric_name": {
+            "type": "string",
+            "title": "Metric Name"
+          },
+          "metric_value": {
+            "type": "number",
+            "title": "Metric Value"
+          },
+          "confusion_matrix": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confusion Matrix"
+          },
+          "raw_metrics": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Raw Metrics"
+          },
+          "evaluated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Evaluated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "run_id",
+          "metric_name",
+          "metric_value",
+          "evaluated_at"
+        ],
+        "title": "EvalResultDetail"
+      },
+      "EvalRunDetail": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "dataset_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Dataset Id"
+          },
+          "dataset_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dataset Name"
+          },
+          "dataset_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dataset Version"
+          },
+          "model_identifier": {
+            "type": "string",
+            "title": "Model Identifier"
+          },
+          "task_type": {
+            "type": "string",
+            "title": "Task Type"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "started_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Started At"
+          },
+          "completed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed At"
+          },
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/EvalResultDetail"
+            },
+            "type": "array",
+            "title": "Results"
+          },
+          "false_negatives": {
+            "items": {
+              "$ref": "#/components/schemas/FalseNegativeItem"
+            },
+            "type": "array",
+            "title": "False Negatives"
+          },
+          "confusion_matrices": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Confusion Matrices"
+          },
+          "calibration_buckets": {
+            "items": {
+              "$ref": "#/components/schemas/CalibrationBucket"
+            },
+            "type": "array",
+            "title": "Calibration Buckets"
+          },
+          "latency_percentiles": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LatencyPercentiles"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "duplicate_metrics": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DuplicateMetrics"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "abstention_rate": {
+            "type": "number",
+            "title": "Abstention Rate",
+            "default": 0.0
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "dataset_id",
+          "model_identifier",
+          "task_type",
+          "status",
+          "started_at"
+        ],
+        "title": "EvalRunDetail"
+      },
+      "EvalRunSummary": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "dataset_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Dataset Id"
+          },
+          "dataset_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dataset Name"
+          },
+          "model_identifier": {
+            "type": "string",
+            "title": "Model Identifier"
+          },
+          "task_type": {
+            "type": "string",
+            "title": "Task Type"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "started_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Started At"
+          },
+          "completed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed At"
+          },
+          "primary_metrics": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "type": "object",
+            "title": "Primary Metrics"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "dataset_id",
+          "model_identifier",
+          "task_type",
+          "status",
+          "started_at"
+        ],
+        "title": "EvalRunSummary"
+      },
+      "FalseNegativeItem": {
+        "properties": {
+          "sample_id": {
+            "type": "string",
+            "title": "Sample Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "language": {
+            "type": "string",
+            "title": "Language"
+          },
+          "expected_priority": {
+            "type": "string",
+            "title": "Expected Priority"
+          },
+          "predicted_priority": {
+            "type": "string",
+            "title": "Predicted Priority"
+          },
+          "rule_hits": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Rule Hits"
+          },
+          "failure_reason": {
+            "type": "string",
+            "title": "Failure Reason",
+            "default": "Model/policy failed to escalate safety-critical grievance"
+          }
+        },
+        "type": "object",
+        "required": [
+          "sample_id",
+          "title",
+          "description",
+          "language",
+          "expected_priority",
+          "predicted_priority"
+        ],
+        "title": "FalseNegativeItem"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "LatencyPercentiles": {
+        "properties": {
+          "p50_ms": {
+            "type": "number",
+            "title": "P50 Ms"
+          },
+          "p90_ms": {
+            "type": "number",
+            "title": "P90 Ms"
+          },
+          "p95_ms": {
+            "type": "number",
+            "title": "P95 Ms"
+          },
+          "p99_ms": {
+            "type": "number",
+            "title": "P99 Ms"
+          },
+          "min_ms": {
+            "type": "number",
+            "title": "Min Ms"
+          },
+          "max_ms": {
+            "type": "number",
+            "title": "Max Ms"
+          },
+          "avg_ms": {
+            "type": "number",
+            "title": "Avg Ms"
+          }
+        },
+        "type": "object",
+        "required": [
+          "p50_ms",
+          "p90_ms",
+          "p95_ms",
+          "p99_ms",
+          "min_ms",
+          "max_ms",
+          "avg_ms"
+        ],
+        "title": "LatencyPercentiles"
+      },
+      "LinkComplaintRequest": {
+        "properties": {
+          "complaint_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Complaint Id"
+          },
+          "is_primary": {
+            "type": "boolean",
+            "title": "Is Primary",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "complaint_id"
+        ],
+        "title": "LinkComplaintRequest"
+      },
+      "LinkDuplicateRequest": {
+        "properties": {
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason",
+            "description": "Optional notes for linking duplicate incident"
+          }
+        },
+        "type": "object",
+        "title": "LinkDuplicateRequest"
+      },
+      "LoginRequest": {
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "title": "Email"
+          },
+          "password": {
+            "type": "string",
+            "title": "Password"
+          }
+        },
+        "type": "object",
+        "required": [
+          "email",
+          "password"
+        ],
+        "title": "LoginRequest"
+      },
+      "ManualTriageQueueItemResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "tracking_number": {
+            "type": "string",
+            "title": "Tracking Number"
+          },
+          "original_title": {
+            "type": "string",
+            "title": "Original Title"
+          },
+          "original_description": {
+            "type": "string",
+            "title": "Original Description"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "original_language": {
+            "type": "string",
+            "title": "Original Language"
+          },
+          "latitude": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latitude"
+          },
+          "longitude": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Longitude"
+          },
+          "address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Address"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "tracking_number",
+          "original_title",
+          "original_description",
+          "status",
+          "original_language",
+          "created_at"
+        ],
+        "title": "ManualTriageQueueItemResponse"
+      },
+      "ManualTriageRequest": {
+        "properties": {
+          "category": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 2,
+            "title": "Category",
+            "description": "Municipal grievance category"
+          },
+          "sub_category": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 128
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sub Category"
+          },
+          "department_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Department Id",
+            "description": "Target department to route complaint"
+          },
+          "priority": {
+            "type": "string",
+            "pattern": "^(CRITICAL|HIGH|MEDIUM|LOW)$",
+            "title": "Priority",
+            "description": "Assessed priority band"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes",
+            "description": "Officer triage and routing rationale"
+          }
+        },
+        "type": "object",
+        "required": [
+          "category",
+          "department_id",
+          "priority"
+        ],
+        "title": "ManualTriageRequest"
+      },
+      "ManualTriageResultResponse": {
+        "properties": {
+          "complaint_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Complaint Id"
+          },
+          "case_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Case Id"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "category": {
+            "type": "string",
+            "title": "Category"
+          },
+          "sub_category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sub Category"
+          },
+          "department_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Department Id"
+          },
+          "priority": {
+            "type": "string",
+            "title": "Priority"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "default": "MANUAL"
+          },
+          "ai_interpretation_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Ai Interpretation Id"
+          },
+          "routing_recommendation_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Routing Recommendation Id"
+          },
+          "priority_assessment_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Priority Assessment Id"
+          },
+          "decided_by_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Decided By Id"
+          },
+          "decided_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Decided At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "complaint_id",
+          "status",
+          "category",
+          "department_id",
+          "priority",
+          "ai_interpretation_id",
+          "routing_recommendation_id",
+          "priority_assessment_id",
+          "decided_by_id",
+          "decided_at"
+        ],
+        "title": "ManualTriageResultResponse"
+      },
+      "NearbySimilarReport": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "tracking_number": {
+            "type": "string",
+            "title": "Tracking Number"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "latitude": {
+            "type": "number",
+            "title": "Latitude"
+          },
+          "longitude": {
+            "type": "number",
+            "title": "Longitude"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "distance_meters": {
+            "type": "number",
+            "title": "Distance Meters"
+          },
+          "support_count": {
+            "type": "integer",
+            "title": "Support Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "tracking_number",
+          "title",
+          "latitude",
+          "longitude",
+          "created_at",
+          "status",
+          "distance_meters",
+          "support_count"
+        ],
+        "title": "NearbySimilarReport"
+      },
+      "OverrideInterpretationRequest": {
+        "properties": {
+          "reason": {
+            "type": "string",
+            "maxLength": 1000,
+            "minLength": 5,
+            "title": "Reason",
+            "description": "Mandatory justification for overriding AI"
+          },
+          "category": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 128
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category"
+          },
+          "sub_category": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 128
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sub Category"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "reason"
+        ],
+        "title": "OverrideInterpretationRequest",
+        "description": "Officer overrides the AI recommendation with custom category/details."
+      },
+      "OverridePriorityRequest": {
+        "properties": {
+          "priority": {
+            "type": "string",
+            "pattern": "^(CRITICAL|HIGH|MEDIUM|LOW)$",
+            "title": "Priority"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 1000,
+            "minLength": 5,
+            "title": "Reason",
+            "description": "Mandatory reason for overriding priority"
+          }
+        },
+        "type": "object",
+        "required": [
+          "priority",
+          "reason"
+        ],
+        "title": "OverridePriorityRequest"
+      },
+      "OverrideRoutingRequest": {
+        "properties": {
+          "department_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Department Id"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 1000,
+            "minLength": 5,
+            "title": "Reason",
+            "description": "Mandatory justification for overriding routing"
+          }
+        },
+        "type": "object",
+        "required": [
+          "department_id",
+          "reason"
+        ],
+        "title": "OverrideRoutingRequest"
+      },
+      "PaginatedResponse_AuditEventResponse_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AuditEventResponse"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          },
+          "has_more": {
+            "type": "boolean",
+            "title": "Has More",
+            "default": false
+          },
+          "total_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Count"
+          }
+        },
+        "type": "object",
+        "title": "PaginatedResponse[AuditEventResponse]"
+      },
+      "PaginatedResponse_ComplaintResponse_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ComplaintResponse"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          },
+          "has_more": {
+            "type": "boolean",
+            "title": "Has More",
+            "default": false
+          },
+          "total_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Count"
+          }
+        },
+        "type": "object",
+        "title": "PaginatedResponse[ComplaintResponse]"
+      },
+      "PriorityAssessmentResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "complaint_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Complaint Id"
+          },
+          "model_priority": {
+            "type": "string",
+            "title": "Model Priority"
+          },
+          "model_confidence": {
+            "type": "number",
+            "title": "Model Confidence"
+          },
+          "model_reasoning": {
+            "type": "string",
+            "title": "Model Reasoning"
+          },
+          "rule_hits": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Rule Hits"
+          },
+          "final_suggested_priority": {
+            "type": "string",
+            "title": "Final Suggested Priority"
+          },
+          "suggested_sla_hours": {
+            "type": "integer",
+            "title": "Suggested Sla Hours"
+          },
+          "is_safety_critical": {
+            "type": "boolean",
+            "title": "Is Safety Critical"
+          },
+          "recommendation_status": {
+            "type": "string",
+            "title": "Recommendation Status"
+          },
+          "decided_by_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decided By Id"
+          },
+          "decision_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decision Reason"
+          },
+          "decided_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decided At"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "complaint_id",
+          "model_priority",
+          "model_confidence",
+          "model_reasoning",
+          "rule_hits",
+          "final_suggested_priority",
+          "suggested_sla_hours",
+          "is_safety_critical",
+          "recommendation_status",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "PriorityAssessmentResponse"
+      },
+      "PriorityPolicyCreate": {
+        "properties": {
+          "policy_name": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 2,
+            "title": "Policy Name"
+          },
+          "language": {
+            "type": "string",
+            "maxLength": 16,
+            "title": "Language",
+            "default": "all"
+          },
+          "keyword_pattern": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 2,
+            "title": "Keyword Pattern"
+          },
+          "elevate_to_priority": {
+            "type": "string",
+            "pattern": "^(CRITICAL|HIGH|MEDIUM|LOW)$",
+            "title": "Elevate To Priority",
+            "default": "CRITICAL"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "is_active": {
+            "type": "boolean",
+            "title": "Is Active",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "policy_name",
+          "keyword_pattern"
+        ],
+        "title": "PriorityPolicyCreate"
+      },
+      "PriorityPolicyResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "policy_name": {
+            "type": "string",
+            "title": "Policy Name"
+          },
+          "language": {
+            "type": "string",
+            "title": "Language"
+          },
+          "keyword_pattern": {
+            "type": "string",
+            "title": "Keyword Pattern"
+          },
+          "elevate_to_priority": {
+            "type": "string",
+            "title": "Elevate To Priority"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "is_active": {
+            "type": "boolean",
+            "title": "Is Active"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "policy_name",
+          "language",
+          "keyword_pattern",
+          "elevate_to_priority",
+          "is_active",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "PriorityPolicyResponse"
+      },
+      "PriorityQueueItem": {
+        "properties": {
+          "complaint_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Complaint Id"
+          },
+          "tracking_number": {
+            "type": "string",
+            "title": "Tracking Number"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "ward_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ward Name"
+          },
+          "final_suggested_priority": {
+            "type": "string",
+            "title": "Final Suggested Priority"
+          },
+          "rule_hits_count": {
+            "type": "integer",
+            "title": "Rule Hits Count"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "complaint_id",
+          "tracking_number",
+          "title",
+          "ward_name",
+          "final_suggested_priority",
+          "rule_hits_count",
+          "created_at"
+        ],
+        "title": "PriorityQueueItem"
+      },
+      "ProposeResolutionRequest": {
+        "properties": {
+          "remediation_summary": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 5,
+            "title": "Remediation Summary",
+            "description": "Mandatory physical remediation summary"
+          },
+          "root_cause_identified": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Root Cause Identified"
+          },
+          "attachment_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Attachment Ids",
+            "description": "Mandatory photographic/documentary proof of remediation"
+          },
+          "review_window_days": {
+            "type": "integer",
+            "maximum": 30.0,
+            "minimum": 1.0,
+            "title": "Review Window Days",
+            "default": 7
+          }
+        },
+        "type": "object",
+        "required": [
+          "remediation_summary",
+          "attachment_ids"
+        ],
+        "title": "ProposeResolutionRequest"
+      },
+      "PublicTrackingResponse": {
+        "properties": {
+          "tracking_number": {
+            "type": "string",
+            "title": "Tracking Number"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "ward_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ward Name"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "tracking_number",
+          "status",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "PublicTrackingResponse",
+        "description": "Publicly safe tracking response containing no private citizen information."
+      },
+      "ReassignCaseRequest": {
+        "properties": {
+          "suggested_department_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Suggested Department Id"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 1000,
+            "minLength": 5,
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "reason"
+        ],
+        "title": "ReassignCaseRequest"
+      },
+      "RefreshRequest": {
+        "properties": {
+          "refresh_token": {
+            "type": "string",
+            "title": "Refresh Token"
+          }
+        },
+        "type": "object",
+        "required": [
+          "refresh_token"
+        ],
+        "title": "RefreshRequest"
+      },
+      "RegisterRequest": {
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "title": "Email"
+          },
+          "phone_number": {
+            "type": "string",
+            "maxLength": 20,
+            "minLength": 7,
+            "title": "Phone Number"
+          },
+          "password": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 8,
+            "title": "Password"
+          },
+          "full_name": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 2,
+            "title": "Full Name"
+          },
+          "address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Address"
+          },
+          "preferred_language": {
+            "type": "string",
+            "maxLength": 16,
+            "title": "Preferred Language",
+            "default": "en"
+          },
+          "notification_preference": {
+            "type": "string",
+            "maxLength": 32,
+            "title": "Notification Preference",
+            "default": "email"
+          }
+        },
+        "type": "object",
+        "required": [
+          "email",
+          "phone_number",
+          "password",
+          "full_name"
+        ],
+        "title": "RegisterRequest"
+      },
+      "RejectInterpretationRequest": {
+        "properties": {
+          "reason": {
+            "type": "string",
+            "maxLength": 1000,
+            "minLength": 5,
+            "title": "Reason",
+            "description": "Mandatory justification for rejection"
+          }
+        },
+        "type": "object",
+        "required": [
+          "reason"
+        ],
+        "title": "RejectInterpretationRequest",
+        "description": "Officer rejects the AI recommendation entirely."
+      },
+      "RejectPriorityRequest": {
+        "properties": {
+          "reason": {
+            "type": "string",
+            "maxLength": 1000,
+            "minLength": 5,
+            "title": "Reason",
+            "description": "Mandatory reason for rejecting priority"
+          }
+        },
+        "type": "object",
+        "required": [
+          "reason"
+        ],
+        "title": "RejectPriorityRequest"
+      },
+      "RejectRoutingRequest": {
+        "properties": {
+          "reason": {
+            "type": "string",
+            "maxLength": 1000,
+            "minLength": 5,
+            "title": "Reason",
+            "description": "Mandatory justification for rejecting routing"
+          }
+        },
+        "type": "object",
+        "required": [
+          "reason"
+        ],
+        "title": "RejectRoutingRequest"
+      },
+      "ResolutionProposalResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "case_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Case Id"
+          },
+          "proposing_officer_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Proposing Officer Id"
+          },
+          "remediation_summary": {
+            "type": "string",
+            "title": "Remediation Summary"
+          },
+          "root_cause_identified": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Root Cause Identified"
+          },
+          "officer_verified": {
+            "type": "boolean",
+            "title": "Officer Verified"
+          },
+          "officer_verified_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Officer Verified At"
+          },
+          "review_window_expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Review Window Expires At"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "evidence_attachment_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Evidence Attachment Ids",
+            "default": []
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "case_id",
+          "proposing_officer_id",
+          "remediation_summary",
+          "officer_verified",
+          "review_window_expires_at",
+          "status",
+          "created_at"
+        ],
+        "title": "ResolutionProposalResponse"
+      },
+      "RoutingRecommendationResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "complaint_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Complaint Id"
+          },
+          "rule_version_used": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rule Version Used"
+          },
+          "primary_department_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Primary Department Id"
+          },
+          "recommended_departments": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Recommended Departments"
+          },
+          "confidence": {
+            "type": "number",
+            "title": "Confidence"
+          },
+          "recommendation_status": {
+            "type": "string",
+            "title": "Recommendation Status"
+          },
+          "decided_by_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decided By Id"
+          },
+          "decision_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decision Reason"
+          },
+          "decided_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decided At"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "complaint_id",
+          "primary_department_id",
+          "recommended_departments",
+          "confidence",
+          "recommendation_status",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "RoutingRecommendationResponse"
+      },
+      "RoutingRuleCreate": {
+        "properties": {
+          "category": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 2,
+            "title": "Category"
+          },
+          "sub_category": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 128
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sub Category"
+          },
+          "ward_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ward Id"
+          },
+          "department_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Department Id"
+          },
+          "priority_override": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 32
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Priority Override"
+          },
+          "effective_from": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effective From"
+          },
+          "effective_to": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effective To"
+          },
+          "is_active": {
+            "type": "boolean",
+            "title": "Is Active",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "category",
+          "department_id"
+        ],
+        "title": "RoutingRuleCreate"
+      },
+      "RoutingRuleResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "rule_version": {
+            "type": "integer",
+            "title": "Rule Version"
+          },
+          "category": {
+            "type": "string",
+            "title": "Category"
+          },
+          "sub_category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sub Category"
+          },
+          "ward_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ward Id"
+          },
+          "department_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Department Id"
+          },
+          "priority_override": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Priority Override"
+          },
+          "effective_from": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Effective From"
+          },
+          "effective_to": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effective To"
+          },
+          "is_active": {
+            "type": "boolean",
+            "title": "Is Active"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "rule_version",
+          "category",
+          "department_id",
+          "effective_from",
+          "is_active",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "RoutingRuleResponse"
+      },
+      "RoutingRuleUpdate": {
+        "properties": {
+          "category": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 128,
+                "minLength": 2
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category"
+          },
+          "sub_category": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 128
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sub Category"
+          },
+          "ward_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ward Id"
+          },
+          "department_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department Id"
+          },
+          "priority_override": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 32
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Priority Override"
+          },
+          "effective_from": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effective From"
+          },
+          "effective_to": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effective To"
+          },
+          "is_active": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Active"
+          }
+        },
+        "type": "object",
+        "title": "RoutingRuleUpdate"
+      },
+      "SetLeadDepartmentRequest": {
+        "properties": {
+          "department_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Department Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "department_id"
+        ],
+        "title": "SetLeadDepartmentRequest"
+      },
+      "SupportComplaintResponse": {
+        "properties": {
+          "complaint_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Complaint Id"
+          },
+          "support_count": {
+            "type": "integer",
+            "title": "Support Count"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "complaint_id",
+          "support_count",
+          "message"
+        ],
+        "title": "SupportComplaintResponse"
+      },
+      "TokenResponse": {
+        "properties": {
+          "access_token": {
+            "type": "string",
+            "title": "Access Token"
+          },
+          "refresh_token": {
+            "type": "string",
+            "title": "Refresh Token"
+          },
+          "token_type": {
+            "type": "string",
+            "title": "Token Type",
+            "default": "Bearer"
+          },
+          "expires_in": {
+            "type": "integer",
+            "title": "Expires In"
+          }
+        },
+        "type": "object",
+        "required": [
+          "access_token",
+          "refresh_token",
+          "expires_in"
+        ],
+        "title": "TokenResponse"
+      },
+      "TransitionCaseRequest": {
+        "properties": {
+          "target_state": {
+            "type": "string",
+            "title": "Target State"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "department_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department Id"
+          },
+          "assigned_officer_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assigned Officer Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "target_state"
+        ],
+        "title": "TransitionCaseRequest"
+      },
+      "UserResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "email": {
+            "type": "string",
+            "title": "Email"
+          },
+          "phone_number": {
+            "type": "string",
+            "title": "Phone Number"
+          },
+          "role": {
+            "type": "string",
+            "title": "Role"
+          },
+          "is_active": {
+            "type": "boolean",
+            "title": "Is Active"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "citizen_profile": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CitizenProfileResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "email",
+          "phone_number",
+          "role",
+          "is_active",
+          "created_at"
+        ],
+        "title": "UserResponse"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    },
+    "securitySchemes": {
+      "HTTPBearer": {
+        "type": "http",
+        "scheme": "bearer"
+      }
+    }
+  }
+}

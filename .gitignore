@@ -1,0 +1,54 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Tooling caches
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment & Secrets — NEVER commit
+.env
+*.pem
+*.key
+
+# Test artifacts
+test_grievance.db
+htmlcov/
+.coverage
+
+# Uploads (local dev)
+uploads/
+
+# Report outputs
+reports/
+
+# Frontend build & dependencies
+node_modules/
+frontend/node_modules/
+frontend/.output/
+frontend/.nitro/
+frontend/.wrangler/
+frontend/.env
+*.zip
