@@ -1,4 +1,5 @@
-from pydantic import Field
+from typing import Any
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -45,6 +46,14 @@ class Settings(BaseSettings):
     )
     RATE_LIMIT_ENABLED: bool = Field(default=True)
     MAX_UPLOAD_SIZE_MB: int = Field(default=15)
+
+    @field_validator("MAX_UPLOAD_SIZE_MB", mode="before")
+    @classmethod
+    def parse_max_upload_size(cls, v: Any) -> int:
+        if isinstance(v, str):
+            cleaned = v.upper().replace("MB", "").replace("M", "").strip()
+            return int(cleaned)
+        return int(v)
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
