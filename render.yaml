@@ -1,0 +1,54 @@
+services:
+  - type: web
+    name: smart-governance-ai-synergy-api
+    runtime: docker
+    region: singapore
+    plan: free
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    dockerCommand: python scripts/start_render.py
+    preDeployCommand: alembic upgrade head
+    healthCheckPath: /health
+    autoDeployTrigger: commit
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: LOG_LEVEL
+        value: INFO
+      - key: DATABASE_URL
+        fromDatabase:
+          name: smart-governance-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          name: smart-governance-cache
+          type: keyvalue
+          property: connectionString
+      - key: JWT_SECRET_KEY
+        generateValue: true
+      - key: CORS_ORIGINS
+        value: https://smart-governance-woad.vercel.app
+      - key: RATE_LIMIT_ENABLED
+        value: "true"
+      - key: AI_ENABLED
+        value: "true"
+      - key: STORAGE_BACKEND
+        value: local
+      - key: LOCAL_UPLOAD_DIR
+        value: /var/data/uploads
+      - key: MAX_UPLOAD_SIZE_MB
+        value: "5"
+
+  - type: keyvalue
+    name: smart-governance-cache
+    region: singapore
+    plan: free
+    ipAllowList: []
+
+databases:
+  - name: smart-governance-db
+    region: singapore
+    plan: free
+    databaseName: smart_governance
+    user: smart_governance
+    ipAllowList: []

@@ -9,6 +9,7 @@ from fastapi import UploadFile
 from shapely.geometry import Point, shape
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import settings
 from app.core.errors import BadRequestError, ForbiddenError, NotFoundError
 from app.core.outbox import enqueue_outbox_event
 from app.core.pagination import PaginatedResponse
@@ -33,8 +34,6 @@ ALLOWED_MIME_TYPES = {
     "image/webp": [".webp"],
     "application/pdf": [".pdf"],
 }
-MAX_FILE_SIZE_BYTES = 15 * 1024 * 1024  # 15 MB
-UPLOAD_DIR = Path("uploads")
 
 
 class WardLookupService:
@@ -238,9 +237,10 @@ class ComplaintService:
 
         # 3. Read content and validate size
         content = await file.read()
-        if len(content) > MAX_FILE_SIZE_BYTES:
+        max_file_size_bytes = settings.MAX_UPLOAD_SIZE_MB * 1024 * 1024
+        if len(content) > max_file_size_bytes:
             raise BadRequestError(
-                detail=f"File size exceeds {MAX_FILE_SIZE_BYTES // (1024 * 1024)}MB maximum limit.",
+                detail=f"File size exceeds {settings.MAX_UPLOAD_SIZE_MB}MB maximum limit.",
                 code="FILE_TOO_LARGE",
             )
 
@@ -261,9 +261,12 @@ class ComplaintService:
         sha256 = hashlib.sha256(content).hexdigest()
 
         # 6. Save to local storage or object store
-        user_dir = UPLOAD_DIR / str(user.id)
+        user_dir = Path(settings.LOCAL_UPLOAD_DIR) / str(user.id)
         user_dir.mkdir(parents=True, exist_ok=True)
-        unique_filename = f"{uuid.uuid4().hex}_{file.filename}"
+        safe_filename = Path(file.filename.replace("\\", "/")).name
+        if not safe_filename or safe_filename in {".", ".."}:
+            raise BadRequestError(detail="Invalid filename", code="INVALID_FILENAME")
+        unique_filename = f"{uuid.uuid4().hex}_{safe_filename}"
         target_path = user_dir / unique_filename
         with open(target_path, "wb") as f:
             f.write(content)
