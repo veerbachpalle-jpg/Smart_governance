@@ -90,9 +90,14 @@ class Settings(BaseSettings):
         """Render and similar hosts expose sync-style Postgres URLs."""
         url = str(value)
         if url.startswith("postgres://"):
-            return url.replace("postgres://", "postgresql+asyncpg://", 1)
-        if url.startswith("postgresql://"):
-            return url.replace("postgresql://", "postgresql+asyncpg://", 1)
+            url = url.replace("postgres://", "postgresql+asyncpg://", 1)
+        elif url.startswith("postgresql://"):
+            url = url.replace("postgresql://", "postgresql+asyncpg://", 1)
+        # asyncpg does not accept sslmode query parameter; convert to ssl
+        if "sslmode=" in url:
+            url = url.replace("sslmode=require", "ssl=require").replace(
+                "sslmode=prefer", "ssl=prefer"
+            ).replace("sslmode=disable", "ssl=disable")
         return url
 
     @field_validator("STORAGE_BACKEND")
