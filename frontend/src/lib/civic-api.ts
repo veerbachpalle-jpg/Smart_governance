@@ -17,8 +17,18 @@ export function setDemoMode(value: boolean) {
   }
 }
 
-const rawBase = import.meta.env["VITE_API_BASE_URL"]?.replace(/\/$/, "") ?? "";
-const base = rawBase && !rawBase.endsWith("/api/v1") ? `${rawBase}/api/v1` : rawBase;
+function getResolvedApiBase(): string {
+  const envUrl = import.meta.env["VITE_API_BASE_URL"];
+  let raw = (envUrl || "https://smart-governance-ai-synergy-api.onrender.com/api/v1").trim().replace(/\/+$/, "");
+  if (raw.includes("smart-governance-ai-synergy-api-1onx.onrender.com")) {
+    raw = raw.replace("smart-governance-ai-synergy-api-1onx.onrender.com", "smart-governance-ai-synergy-api.onrender.com");
+  }
+  if (!raw.endsWith("/api/v1")) {
+    raw = `${raw}/api/v1`;
+  }
+  return raw;
+}
+const base = getResolvedApiBase();
 const SESSION_KEY = "civic-session";
 
 function readStoredSession(): Tokens | null {
@@ -325,6 +335,17 @@ async function uploadDataUrl(dataUrl: string, index: number): Promise<string> {
   return uploaded.id;
 }
 
+async function resolveCaseIdForComplaint(complaintBackendId: string): Promise<string> {
+  try {
+    const casesResp = await request<{ items: Array<{ id: string; complaint_ids: string[] }> }>("/cases?limit=100");
+    const matched = casesResp.items.find((c) => c.complaint_ids.includes(complaintBackendId));
+    if (matched) return matched.id;
+  } catch {
+    // ignore
+  }
+  return complaintBackendId;
+}
+
 export const civicApi = {
   async departments(): Promise<MunicipalDepartment[]> {
     if (isDemo) {
@@ -354,7 +375,6 @@ export const civicApi = {
       }
       return;
     }
-
 
     if (!complaint.backendId) throw new ApiError("Complaint not found.", 404);
     const decisionPath = decision.toLowerCase();
@@ -402,7 +422,23 @@ export const civicApi = {
     if (!isDemo) {
       if (!tokens) return [];
       const page = await request<BackendPage<BackendComplaint>>("/complaints?limit=100");
-      return page.items.map(toComplaint);
+      let caseMap: Record<string, string> = {};
+      try {
+        const casesResp = await request<{ items: Array<{ id: string; complaint_ids: string[] }> }>("/cases?limit=100");
+        for (const c of casesResp.items) {
+          for (const cid of c.complaint_ids) {
+            caseMap[cid] = c.id;
+          }
+        }
+      } catch {
+        // non-staff
+      }
+      return page.items.map((item) => {
+        const c = toComplaint(item);
+        const mappedCaseId = caseMap[item.id];
+        if (mappedCaseId) c.caseId = mappedCaseId;
+        return c;
+      });
     }
     await delay();
     return demoRows;
@@ -498,27 +534,81 @@ export const civicApi = {
     if (!isDemo) {
       const row = await this.list().then((items) => items.find((item) => item.id === id));
       if (!row?.backendId) throw new ApiError("Complaint not found.", 404);
+      const caseId = row.caseId || (await resolveCaseIdForComplaint(row.backendId));
       switch (action) {
         case "support":
           await request(`/complaints/${row.backendId}/support`, { method: "POST", body: "{}" });
           break;
-        case "confirm":
-          await request(`/cases/${row.backendId}/confirm`, { method: "POST", body: JSON.stringify(changes) });
+        case "confirm": {
+          const feedbackText = (changes as any)?.note || "Resolution verified and confirmed";
+          await request(`/cases/${caseId}/confirm`, {
+            method: "POST",
+            body: JSON.stringify({ feedback: feedbackText }),
+          });
           break;
-        case "challenge":
-          await request(`/cases/${row.backendId}/challenge`, { method: "POST", body: JSON.stringify(changes) });
+        }
+        case "challenge": {
+          const reason = (changes as any)?.challenge?.reason || "Citizen contested resolution";
+          await request(`/cases/${caseId}/challenge`, {
+            method: "POST",
+            body: JSON.stringify({
+              challenge_type: "RESOLUTION",
+              reason,
+              attachment_ids: [],
+            }),
+          });
           break;
-        case "propose-resolution":
-          await request(`/cases/${row.backendId}/resolve`, { method: "POST", body: JSON.stringify(changes) });
+        }
+        case "propose-resolution": {
+          const resolution = (changes as any)?.resolution;
+          const summary = resolution?.notes || "Physical remediation completed and verified";
+          let attachmentIds: string[] = [];
+          if (resolution?.evidence?.length) {
+            try {
+              attachmentIds = await Promise.all(
+                resolution.evidence
+                  .filter((e: string) => e.startsWith("data:"))
+                  .map((e: string, idx: number) => uploadDataUrl(e, idx))
+              );
+            } catch {
+              // fallback
+            }
+          }
+          await request(`/cases/${caseId}/resolve`, {
+            method: "POST",
+            body: JSON.stringify({
+              remediation_summary: summary,
+              attachment_ids: attachmentIds.length > 0 ? attachmentIds : ((row as any).attachments?.map((a: any) => a.id).filter(Boolean) || []),
+              review_window_days: 7,
+            }),
+          });
           break;
+        }
+        case "note": {
+          const noteText = changes.activity?.[0]?.note || "Staff note";
+          const isVisible = changes.activity?.[0]?.public ?? false;
+          await request(`/cases/${caseId}/activity`, {
+            method: "POST",
+            body: JSON.stringify({
+              note: noteText,
+              is_citizen_visible: isVisible,
+            }),
+          });
+          break;
+        }
         case "assign":
-          await request(`/cases/${row.backendId}/assign`, { method: "POST", body: JSON.stringify(changes) });
+          await request(`/cases/${caseId}/assign`, { method: "POST", body: JSON.stringify(changes) });
           break;
         case "reassign":
-          await request(`/cases/${row.backendId}/reassign`, { method: "POST", body: JSON.stringify(changes) });
+          await request(`/cases/${caseId}/reassign`, {
+            method: "POST",
+            body: JSON.stringify({
+              reason: changes.activity?.[0]?.note || "Reassignment requested",
+            }),
+          });
           break;
         default:
-          throw new ApiError(`Unsupported action "${action}" in production mode.`, 400);
+          break;
       }
       return row;
     }

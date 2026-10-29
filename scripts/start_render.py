@@ -15,9 +15,10 @@ import time
 
 def wait_for_db() -> None:
     try:
-        from app.config import settings
-        from urllib.parse import urlparse
         import socket
+        from urllib.parse import urlparse
+
+        from app.config import settings
 
         url = settings.DATABASE_URL
         if "sqlite" in url:

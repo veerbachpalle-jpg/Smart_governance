@@ -43,7 +43,7 @@ import {
   CategoryIcon,
 } from "./shared";
 import LocationMap from "./LocationMap";
-import { civicApi, getSession, isDemo, request, setTokens } from "@/lib/civic-api";
+import { civicApi, getSession, isDemo, request, setTokens, setDemoMode } from "@/lib/civic-api";
 import { useOnline, distanceMeters } from "@/lib/civic-sim";
 import type { Complaint, Category, Tokens, TrendingIssue } from "@/lib/civic-types";
 const schema = z.object({
@@ -1198,16 +1198,35 @@ export function SignInPage() {
           title={t("signIn")}
           subtitle="Secure access to your municipal service account."
         />
+        <div className="mb-4 mt-6">
+          <p className="mb-2 text-[11px] font-semibold text-muted-foreground">Quick demo credentials:</p>
+          <div className="flex flex-wrap gap-1.5">
+            {[
+              { label: "Citizen", email: "citizen@example.com", pass: "CitizenDemo123!" },
+              { label: "Officer", email: "officer@example.com", pass: "OfficerDemo123!" },
+              { label: "Lead", email: "lead@example.com", pass: "LeadDemo123!" },
+              { label: "Supervisor", email: "supervisor@example.com", pass: "SupervisorDemo123!" },
+              { label: "Admin", email: "admin@example.com", pass: "AdminDemo123!" },
+              { label: "Auditor", email: "auditor@example.com", pass: "AuditorDemo123!" },
+            ].map((acc) => (
+              <button
+                key={acc.label}
+                type="button"
+                className="rounded border border-border bg-secondary px-2.5 py-1 text-[11px] font-medium transition hover:bg-primary hover:text-primary-foreground"
+                onClick={() => {
+                  setEmail(acc.email);
+                  setPassword(acc.pass);
+                }}
+              >
+                {acc.label}
+              </button>
+            ))}
+          </div>
+        </div>
         <form
           className="space-y-5"
           onSubmit={async (event) => {
             event.preventDefault();
-            if (isDemo) {
-              setError(
-                "The sign-in service is not connected. Use the clearly labeled demonstration workspace to explore the portal.",
-              );
-              return;
-            }
             setBusy(true);
             setError("");
             try {
@@ -1216,6 +1235,7 @@ export function SignInPage() {
                 body: JSON.stringify({ email, password }),
               });
               setTokens(session);
+              setDemoMode(false);
               await queryClient.invalidateQueries({ queryKey: ["complaints"] });
               const role = getSession()?.role ?? "citizen";
               await navigate(
@@ -1223,6 +1243,7 @@ export function SignInPage() {
                   ? { to: "/" }
                   : { to: "/staff/$view", params: { view: "dashboard" } },
               );
+              toast.success("Signed in successfully.");
             } catch (failure) {
               setError(failure instanceof Error ? failure.message : "Sign-in failed.");
             } finally {

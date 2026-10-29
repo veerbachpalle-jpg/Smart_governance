@@ -28,7 +28,7 @@ services:
       - key: JWT_ALGORITHM
         value: HS256
       - key: CORS_ORIGINS
-        value: https://smart-governance-woad.vercel.app
+        value: https://frontend-nine-sandy-25.vercel.app
       - key: RATE_LIMIT_ENABLED
         value: "true"
       - key: AI_ENABLED

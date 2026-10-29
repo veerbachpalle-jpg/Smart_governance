@@ -200,7 +200,7 @@ async def test_status_query_flow_with_complaints(
     reply = await service.process_inbound_message(user, msg)
     assert "GRV-20261029-TEST01" in reply
     assert "Open manhole near park" in reply
-    assert "https://smart-governance-woad.vercel.app/track" in reply
+    assert "https://frontend-nine-sandy-25.vercel.app/track" in reply
 
     # 2. Specific tracking number check
     msg_specific = WhatsAppInboundMessage(
@@ -253,7 +253,7 @@ async def test_new_complaint_flow_text_then_location(
     assert "Tracking ID: GRV-" in reply_loc
     assert "Department:" in reply_loc
     assert "Status: Submitted (Awaiting Officer Triage)" in reply_loc
-    assert "Track anytime: https://smart-governance-woad.vercel.app/track" in reply_loc
+    assert "Track anytime: https://frontend-nine-sandy-25.vercel.app/track" in reply_loc
     assert "Or simply text \"STATUS\" to this chat." in reply_loc
 
     # Verify session cleared

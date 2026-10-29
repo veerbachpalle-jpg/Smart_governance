@@ -262,7 +262,7 @@ class WhatsAppService:
                 f"Department: {dept_name}\n"
                 f"Status: {complaint.status}\n"
                 f"Ward: {complaint.ward_name or 'Unassigned'}\n\n"
-                f"Track anytime: https://smart-governance-woad.vercel.app/track"
+                f"Track anytime: https://frontend-nine-sandy-25.vercel.app/track"
             )
 
         # General status inquiry: list recent complaints for this citizen
@@ -283,7 +283,7 @@ class WhatsAppService:
                 f"{idx}. [{complaint.tracking_number}] {complaint.original_title[:40]}\n"
                 f"   Status: {complaint.status} | Ward: {complaint.ward_name or 'Unassigned'}"
             )
-        lines.append("\nTrack anytime: https://smart-governance-woad.vercel.app/track")
+        lines.append("\nTrack anytime: https://frontend-nine-sandy-25.vercel.app/track")
         return "\n".join(lines)
 
     async def _handle_audio_intake(
@@ -461,7 +461,7 @@ class WhatsAppService:
             f"Tracking ID: {complaint.tracking_number}\n"
             f"Department: {dept_name}\n"
             f"Status: Submitted (Awaiting Officer Triage)\n\n"
-            f"Track anytime: https://smart-governance-woad.vercel.app/track\n"
+            f"Track anytime: https://frontend-nine-sandy-25.vercel.app/track\n"
             f"Or simply text \"STATUS\" to this chat."
         )
 

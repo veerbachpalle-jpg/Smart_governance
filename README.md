@@ -2,7 +2,7 @@
 
 ### AI-Assisted Municipal Grievance Intelligence and Accountability
 
-**Live frontend demo:** https://smart-governance-woad.vercel.app/  
+**Live frontend demo:** https://frontend-nine-sandy-25.vercel.app/  
 **API documentation (local):** http://localhost:8000/docs
 
 > **Core principle: AI recommends; accountable people decide.**
