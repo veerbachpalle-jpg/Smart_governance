@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { useEffect, useState } from 'react';
 import { Link, useRouterState } from '@tanstack/react-router';
 import { useTranslation } from 'react-i18next';
-import { Building2, LayoutDashboard, PlusCircle, Files, ScanSearch, Headphones, ArrowUpRight, ShieldCheck, ChevronDown, Bell, Globe2, MapPin, Menu, X, ClipboardList, Scale, SlidersHorizontal, ScrollText, Activity, ArrowLeft, LogOut } from 'lucide-react';
+import { Building2, LayoutDashboard, PlusCircle, Files, ScanSearch, Headphones, ArrowUpRight, ShieldCheck, ChevronDown, Bell, Globe2, MapPin, Menu, X, ClipboardList, Scale, SlidersHorizontal, ScrollText, Activity, ArrowLeft, LogOut, Clock3 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { isDemo, setDemoMode, getIsDemo } from '@/lib/civic-api';
@@ -33,13 +33,11 @@ export function PortalShell({ children }: { children: ReactNode }) {
   }, []);
 
   const staffLinks = [
-    { label: 'dashboard', view: 'dashboard', icon: LayoutDashboard, roles: ['officer', 'lead', 'supervisor', 'admin', 'auditor'] },
-    { label: 'triage', view: 'triage', icon: ScanSearch, roles: ['officer', 'lead', 'supervisor', 'admin'] },
-    { label: 'cases', view: 'cases', icon: ClipboardList, roles: ['officer', 'lead', 'supervisor', 'admin'] },
-    { label: 'challenges', view: 'challenges', icon: Scale, roles: ['supervisor', 'admin'] },
-    { label: 'policies', view: 'policies', icon: SlidersHorizontal, roles: ['admin'] },
-    { label: 'audit', view: 'audit', icon: ScrollText, roles: ['auditor', 'supervisor', 'admin'] },
-    { label: 'quality', view: 'quality', icon: Activity, roles: ['lead', 'supervisor', 'admin', 'auditor'] },
+    { label: 'dashboard', view: 'dashboard', icon: LayoutDashboard, roles: ['officer', 'supervisor'] },
+    { label: 'triage', view: 'triage', icon: ScanSearch, roles: ['officer', 'supervisor'] },
+    { label: 'cases', view: 'cases', icon: ClipboardList, roles: ['officer', 'supervisor'] },
+    { label: 'challenges', view: 'challenges', icon: Scale, roles: ['supervisor'] },
+    { label: 'quality', view: 'quality', icon: Activity, roles: ['supervisor'] },
   ];
   const currentRole = demoActive ? role : getSession()?.role ?? 'citizen';
   return <div>
@@ -50,9 +48,9 @@ export function PortalShell({ children }: { children: ReactNode }) {
       <div className="mx-5 mb-7 flex h-12 items-center gap-3 rounded-md border border-sidebar-border px-3"><span className="grid size-7 place-items-center rounded bg-sidebar-accent"><Building2 className="size-4 text-sidebar-dim" /></span><span className="text-xs font-medium">{t(staff ? 'staffConsole' : 'citizenPortal')}</span><ChevronDown className="ml-auto size-3 text-sidebar-dim" /></div>
       <div className="px-5"><p className="section-label mb-3 px-3 text-sidebar-dim">{staff ? 'WORKSPACE' : 'CITIZEN SERVICES'}</p><nav className="space-y-1">
         {staff ? staffLinks.filter(link => link.roles.includes(currentRole)).map(link => <Link key={link.view} to="/staff/$view" params={{ view: link.view }} className={`nav-item ${pathname === `/staff/${link.view}` ? 'active' : ''}`}><link.icon />{t(link.label)}</Link>) : <>
-          <Link to="/" className={`nav-item ${pathname === '/' ? 'active' : ''}`}><LayoutDashboard />{t('overview')}</Link>
-          <Link to="/report" className={`nav-item ${pathname === '/report' ? 'active' : ''}`}><PlusCircle />{t('submit')}</Link>
-          <Link to="/complaints" className={`nav-item ${pathname.startsWith('/complaints') ? 'active' : ''}`}><Files />{t('myComplaints')}</Link>
+          <Link to="/" className={`nav-item ${pathname === '/' ? 'active' : ''}`}><LayoutDashboard />Home (Neighbours)</Link>
+          <Link to="/complaints" className={`nav-item ${pathname === '/complaints' ? 'active' : ''}`}><Files />All Complaints</Link>
+          <Link to="/report" className={`nav-item ${pathname === '/report' ? 'active' : ''}`}><PlusCircle />Submit Complaint</Link>
           <Link to="/track" className={`nav-item ${pathname === '/track' ? 'active' : ''}`}><ScanSearch />{t('track')}</Link>
         </>}
       </nav></div>
@@ -61,7 +59,7 @@ export function PortalShell({ children }: { children: ReactNode }) {
       <Link to="/signin" className="flex items-center gap-3 border-t border-sidebar-border px-6 py-5"><div className="grid size-9 place-items-center rounded-full bg-sidebar-accent"><span className="text-sm font-semibold text-sidebar-active">{staff ? 'S' : 'C'}</span></div><div><p className="text-xs font-medium">{demoActive ? (staff ? 'Staff workspace' : 'Citizen workspace') : t('signIn')}</p><p className="mt-1 text-[10px] text-sidebar-dim">{demoActive ? 'Demonstration access' : 'Secure account access'}</p></div><LogOut className="ml-auto size-4 text-sidebar-dim" /></Link>
     </aside>
     <div className="app-body"><header className="flex h-[73px] items-center justify-between gap-3 border-b border-border bg-surface px-5 lg:px-10"><div className="flex items-center gap-3"><Button variant="ghost" size="icon" className="min-h-11 min-w-11 md:hidden" onClick={() => setOpen(true)} aria-label={t('menu')}><Menu /></Button><span className="flex items-center gap-2 text-[12px] font-medium"><MapPin className="size-4 text-primary" />{t('city')}<span className="hidden font-normal text-muted-foreground lg:inline"><span className="mx-3 text-border">/</span>{t('portalName')}</span></span></div><div className="flex items-center gap-4">
-      {staff && demoActive && <select aria-label="Demonstration staff role" value={role} onChange={event => setRole(event.target.value as Role)} className="max-w-32 rounded-md border border-input bg-background p-2 text-xs"><option value="officer">Officer</option><option value="lead">Department lead</option><option value="supervisor">Supervisor</option><option value="admin">Administrator</option><option value="auditor">Auditor</option></select>}
+      {staff && demoActive && <select aria-label="Demonstration staff role" value={role} onChange={event => setRole(event.target.value as Role)} className="max-w-36 rounded-md border border-input bg-background p-2 text-xs"><option value="officer">Department Officer</option><option value="supervisor">Supervisor</option></select>}
       <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" className="gap-2 px-2"><Globe2 className="size-4 text-muted-foreground" /><span className="hidden sm:inline">{{ en: 'English', hi: 'हिन्दी', kn: 'ಕನ್ನಡ' }[i18n.language] ?? 'English'}</span><ChevronDown className="size-3" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end">{([['en', 'English'], ['hi', 'हिन्दी'], ['kn', 'ಕನ್ನಡ']] as const).map(([lang, label]) => <DropdownMenuItem key={lang} onClick={() => { void i18n.changeLanguage(lang); localStorage.setItem('civic-language', lang); }}>{label}</DropdownMenuItem>)}</DropdownMenuContent></DropdownMenu>
       <span className="h-5 border-l border-border" /><Button variant="ghost" size="icon" className="min-h-11 min-w-11" aria-label={t('notify')} onClick={() => toast.info(demoActive ? 'One sample complaint is awaiting your resolution review.' : 'Sign in to view your notifications.')}><Bell className="size-[18px]" /></Button><Link to="/signin" className="hidden size-8 items-center justify-center rounded-full border border-border bg-secondary text-xs font-semibold text-primary sm:flex" aria-label={t('profile')}>{staff ? 'S' : 'C'}</Link>
     </div></header>

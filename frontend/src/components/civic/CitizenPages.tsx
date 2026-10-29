@@ -24,6 +24,8 @@ import {
   FileCheck2,
   Mic,
   LoaderCircle,
+  RotateCcw,
+  CheckCheck,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -42,7 +44,7 @@ import {
   categories,
   CategoryIcon,
 } from "./shared";
-import LocationMap from "./LocationMap";
+import LocationMap, { getDepartmentColor } from "./LocationMap";
 import { civicApi, getSession, isDemo, request, setTokens, setDemoMode } from "@/lib/civic-api";
 import { useOnline, distanceMeters } from "@/lib/civic-sim";
 import type { Complaint, Category, Tokens, TrendingIssue } from "@/lib/civic-types";
@@ -199,57 +201,458 @@ export function PopularIssuesNearYou({
 export function ComplaintsPage() {
   const { data: rows } = useSuspenseQuery(complaintsQuery);
   const { t } = useTranslation();
+  const queryClient = useQueryClient();
+
+  // Read initial tab from URL if present
+  const getInitialTab = (): "all" | "mine" | "review" => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const tabParam = params.get("tab");
+      if (tabParam === "mine" || tabParam === "review" || tabParam === "all") return tabParam;
+    }
+    return "all";
+  };
+
+  const [activeTab, setActiveTab] = useState<"all" | "mine" | "review">(getInitialTab());
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("all");
-  const filtered = rows.filter(
-    (row) =>
-      (status === "all" || row.status === status) &&
-      `${row.title} ${row.id} ${row.category}`.toLowerCase().includes(search.toLowerCase()),
-  );
+  const [department, setDepartment] = useState("all");
+
+  // Reopen / challenge dialog state
+  const [reopenTarget, setReopenTarget] = useState<Complaint | null>(null);
+  const [reopenReason, setReopenReason] = useState("");
+  const [busyAction, setBusyAction] = useState(false);
+
+  // Identify My Complaints: from sessionStorage or default to first 2 demo items
+  const myIds: string[] = (() => {
+    if (typeof window === "undefined") return [];
+    try {
+      const stored = JSON.parse(sessionStorage.getItem("civic_my_complaints") || "[]");
+      if (Array.isArray(stored) && stored.length > 0) return stored;
+    } catch {
+      // fallback
+    }
+    return [rows[0]?.id, rows[1]?.id].filter(Boolean);
+  })();
+
+  const myComplaints = rows.filter((r) => myIds.includes(r.id));
+  const reviewAwaiting = rows.filter((r) => r.status === "review");
+  const recentlySolved = rows.filter((r) => r.status === "resolved");
+  const reviewTabRows = rows.filter((r) => ["review", "resolved", "challenged", "reopened"].includes(r.status));
+
+  // Determine base list based on active tab
+  const baseRows =
+    activeTab === "mine"
+      ? myComplaints
+      : activeTab === "review"
+        ? reviewTabRows
+        : rows;
+
+  const filtered = baseRows.filter((row) => {
+    const matchesSearch = `${row.title} ${row.id} ${row.category} ${row.department} ${row.address}`
+      .toLowerCase()
+      .includes(search.toLowerCase());
+    const matchesStatus = status === "all" || row.status === status;
+    const matchesDept = department === "all" || row.department === department;
+    return matchesSearch && matchesStatus && matchesDept;
+  });
+
+  const allDepts = Array.from(new Set(rows.map((r) => r.department).filter(Boolean)));
+
+  async function handleConfirmSatisfaction(row: Complaint) {
+    setBusyAction(true);
+    try {
+      await civicApi.update(row.id, { note: "Citizen verified satisfaction with resolution." }, "confirm");
+      toast.success(`Resolution for ${row.id} confirmed and closed!`);
+      await queryClient.invalidateQueries({ queryKey: ["complaints"] });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Confirmation failed.");
+    } finally {
+      setBusyAction(false);
+    }
+  }
+
+  async function handleReopenCase() {
+    if (!reopenTarget || reopenReason.trim().length < 8) {
+      toast.error("Please provide at least 8 characters explaining why the issue is not resolved.");
+      return;
+    }
+    setBusyAction(true);
+    try {
+      await civicApi.update(
+        reopenTarget.id,
+        { status: "challenged", challenge: { reason: reopenReason, evidence: [] } },
+        "challenge",
+      );
+      toast.success(`Case ${reopenTarget.id} reopened and routed to supervisor!`);
+      setReopenTarget(null);
+      setReopenReason("");
+      await queryClient.invalidateQueries({ queryKey: ["complaints"] });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to reopen case.");
+    } finally {
+      setBusyAction(false);
+    }
+  }
+
   return (
     <div className="page-container fade-in">
       <PageHeading
-        title={t("myComplaints")}
-        subtitle={`${rows.length} reports · Every update, in one place`}
+        title="Civic Complaints"
+        subtitle="Track municipal reports, follow accountable departments, and review solved cases within the 7-day review window."
         action={
-          <Button asChild className="h-11">
+          <Button asChild className="h-11 px-5">
             <Link to="/report">
-              <Plus />
+              <Plus className="size-4 mr-1.5" />
               {t("newReport")}
             </Link>
           </Button>
         }
       />
-      <div className="mb-5 flex flex-wrap gap-3">
-        <div className="relative min-w-52 flex-1">
-          <Search className="absolute left-3 top-3.5 size-4 text-muted-foreground" />
-          <input
-            className="form-field pl-10"
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder={t("search")}
-            aria-label={t("search")}
-          />
-        </div>
-        <select
-          className="form-field w-auto"
-          aria-label="Filter by status"
-          value={status}
-          onChange={(event) => setStatus(event.target.value)}
+
+      {/* Primary Tab Switcher */}
+      <div className="mb-6 flex border-b border-border">
+        <button
+          type="button"
+          onClick={() => setActiveTab("all")}
+          className={`flex items-center gap-2 border-b-2 px-5 py-3 text-xs font-semibold transition-colors ${
+            activeTab === "all"
+              ? "border-primary text-primary"
+              : "border-transparent text-muted-foreground hover:text-foreground"
+          }`}
         >
-          <option value="all">{t("allStatuses")}</option>
-          {["submitted", "in_progress", "review", "resolved", "challenged", "reopened"].map(
-            (value) => (
-              <option key={value} value={value}>
-                {t(value)}
-              </option>
-            ),
+          <span>All Complaints</span>
+          <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-bold text-muted-foreground">
+            {rows.length}
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab("mine")}
+          className={`flex items-center gap-2 border-b-2 px-5 py-3 text-xs font-semibold transition-colors ${
+            activeTab === "mine"
+              ? "border-primary text-primary"
+              : "border-transparent text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          <span>My Complaints</span>
+          <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary">
+            {myComplaints.length}
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab("review")}
+          className={`flex items-center gap-2 border-b-2 px-5 py-3 text-xs font-semibold transition-colors ${
+            activeTab === "review"
+              ? "border-primary text-primary"
+              : "border-transparent text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          <span>Recents (7-Day Review)</span>
+          {reviewAwaiting.length > 0 ? (
+            <span className="rounded-full bg-warning/20 px-2 py-0.5 text-[10px] font-bold text-warning animate-pulse">
+              {reviewAwaiting.length} pending
+            </span>
+          ) : (
+            <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-bold text-muted-foreground">
+              {reviewTabRows.length}
+            </span>
           )}
-        </select>
+        </button>
       </div>
-      <section className="panel">
-        <ComplaintTable rows={filtered} />
-      </section>
+
+      {/* If in Recents (7-Day Review) tab, display 7-day review action section */}
+      {activeTab === "review" ? (
+        <div className="space-y-6">
+          <div className="rounded-lg border border-warning/30 bg-warning-soft p-5">
+            <div className="flex items-start gap-3">
+              <Clock3 className="mt-0.5 size-5 shrink-0 text-warning" />
+              <div>
+                <h3 className="text-sm font-bold text-warning-foreground">
+                  7-Day Citizen Resolution Review Window
+                </h3>
+                <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                  Whenever a department officer finishes remediation on a complaint, it enters a <strong>7-day citizen review window</strong>. As a citizen, you can inspect the location and choose to either <strong>Confirm Satisfaction</strong> (which formally closes the case) or <strong>Object & Reopen Case</strong> if the problem is still unresolved.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Pending Reviews First */}
+          {reviewAwaiting.length > 0 && (
+            <section className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-warning">
+                  Pending Your Review ({reviewAwaiting.length})
+                </h3>
+                <span className="text-[10px] text-muted-foreground">
+                  Review before the 7-day deadline expires
+                </span>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                {reviewAwaiting.map((row) => {
+                  const deadline = row.resolution?.deadline
+                    ? new Date(row.resolution.deadline)
+                    : new Date(Date.now() + 7 * 86400000);
+                  const daysLeft = Math.max(
+                    0,
+                    Math.ceil((deadline.getTime() - Date.now()) / 86400000),
+                  );
+                  return (
+                    <div
+                      key={row.id}
+                      className="rounded-lg border-2 border-warning/30 bg-surface p-5 shadow-xs flex flex-col justify-between"
+                    >
+                      <div>
+                        <div className="flex items-center justify-between gap-2 mb-2">
+                          <span className="text-xs font-bold text-primary">{row.id}</span>
+                          <span className="rounded-full bg-warning/20 px-2.5 py-0.5 text-[10px] font-bold text-warning">
+                            ⏱ {daysLeft} {daysLeft === 1 ? "day" : "days"} remaining
+                          </span>
+                        </div>
+                        <Link
+                          to="/complaints/$id"
+                          params={{ id: row.id }}
+                          className="text-base font-bold text-foreground hover:text-primary hover:underline"
+                        >
+                          {row.title}
+                        </Link>
+                        <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+                          <strong>Officer Remediation Note:</strong>{" "}
+                          {row.resolution?.notes || "Remediation submitted by department officer for citizen review."}
+                        </p>
+                        <div className="mt-2 text-[11px] text-muted-foreground">
+                          <strong>Department:</strong> {row.department} · {row.ward}
+                        </div>
+                        {row.resolution?.evidence && row.resolution.evidence.length > 0 && (
+                          <div className="mt-3">
+                            <span className="text-[10px] font-semibold text-muted-foreground uppercase">
+                              Officer Site Photos:
+                            </span>
+                            <div className="mt-1 flex gap-2 overflow-x-auto">
+                              {row.resolution.evidence.map((photo, i) => (
+                                <img
+                                  key={i}
+                                  src={photo}
+                                  alt="Remediation evidence"
+                                  className="size-16 rounded object-cover border border-border"
+                                />
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="mt-5 pt-4 border-t border-border flex flex-wrap items-center justify-between gap-2">
+                        <Link
+                          to="/complaints/$id"
+                          params={{ id: row.id }}
+                          className="text-xs font-medium text-primary hover:underline flex items-center gap-1"
+                        >
+                          View Full Event & Remarks &rarr;
+                        </Link>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-8 px-2.5 text-xs text-destructive hover:bg-destructive/10 border-destructive/30"
+                            disabled={busyAction}
+                            onClick={() => setReopenTarget(row)}
+                          >
+                            <RotateCcw className="size-3 mr-1" />
+                            Object / Reopen
+                          </Button>
+                          <Button
+                            size="sm"
+                            className="h-8 px-3 text-xs bg-success hover:bg-success/90 text-success-foreground font-semibold"
+                            disabled={busyAction}
+                            onClick={() => handleConfirmSatisfaction(row)}
+                          >
+                            <Check className="size-3 mr-1" />
+                            Confirm Satisfied
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+          )}
+
+          {/* Solved / Closed Complaints */}
+          <section className="space-y-3">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+              Solved & Citizen-Verified Complaints ({recentlySolved.length})
+            </h3>
+            <div className="panel divide-y divide-border">
+              {recentlySolved.map((row) => (
+                <div key={row.id} className="p-4 hover:bg-muted/30 transition-colors">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="flex items-start gap-3 min-w-0">
+                      <div
+                        className="mt-1 size-3 rounded-full shrink-0"
+                        style={{ backgroundColor: getDepartmentColor(row.department) }}
+                      />
+                      <div>
+                        <Link
+                          to="/complaints/$id"
+                          params={{ id: row.id }}
+                          className="text-xs font-bold text-foreground hover:text-primary"
+                        >
+                          {row.title}
+                        </Link>
+                        <p className="mt-1 text-xs text-muted-foreground line-clamp-1">
+                          {row.description}
+                        </p>
+                        <div className="mt-2 flex flex-wrap items-center gap-2 text-[10px] text-muted-foreground">
+                          <span className="font-semibold text-foreground">{row.id}</span>
+                          <span>·</span>
+                          <span>{row.department}</span>
+                          <span>·</span>
+                          <span>{row.ward}</span>
+                          <span>·</span>
+                          <span className="text-success font-semibold flex items-center gap-1">
+                            <CheckCheck className="size-3" />
+                            Satisfaction Confirmed & Closed
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    <Button asChild size="sm" variant="ghost" className="h-8 text-xs shrink-0">
+                      <Link to="/complaints/$id" params={{ id: row.id }}>
+                        Full Event Remarks &rarr;
+                      </Link>
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        </div>
+      ) : (
+        <>
+          {/* Filters for All Complaints and My Complaints */}
+          <div className="mb-5 flex flex-wrap gap-3">
+            <div className="relative min-w-52 flex-1">
+              <Search className="absolute left-3 top-3.5 size-4 text-muted-foreground" />
+              <input
+                className="form-field pl-10"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Search by title, tracking ID, department, or location..."
+                aria-label={t("search")}
+              />
+            </div>
+
+            <select
+              className="form-field w-auto"
+              aria-label="Filter by department"
+              value={department}
+              onChange={(event) => setDepartment(event.target.value)}
+            >
+              <option value="all">All Departments</option>
+              {allDepts.map((d) => (
+                <option key={d} value={d}>
+                  {d}
+                </option>
+              ))}
+            </select>
+
+            <select
+              className="form-field w-auto"
+              aria-label="Filter by status"
+              value={status}
+              onChange={(event) => setStatus(event.target.value)}
+            >
+              <option value="all">{t("allStatuses")}</option>
+              {["submitted", "in_progress", "review", "resolved", "challenged", "reopened"].map(
+                (value) => (
+                  <option key={value} value={value}>
+                    {t(value)}
+                  </option>
+                ),
+              )}
+            </select>
+          </div>
+
+          <section className="panel">
+            {filtered.length === 0 ? (
+              <div className="p-8 text-center text-xs text-muted-foreground">
+                {activeTab === "mine"
+                  ? "You have not submitted any complaints yet. Click 'New Report' above to report an issue in your area."
+                  : "No complaints found matching your search filters."}
+              </div>
+            ) : (
+              <ComplaintTable rows={filtered} />
+            )}
+          </section>
+        </>
+      )}
+
+      {/* Modal Dialog for Reopening Case */}
+      <Dialog open={Boolean(reopenTarget)} onOpenChange={(open) => { if (!open) setReopenTarget(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Object & Reopen Complaint</DialogTitle>
+            <DialogDescription>
+              Explain why the issue is still not solved or has re-occurred. Your objection will reopen the case and assign it to a department supervisor for independent review.
+            </DialogDescription>
+          </DialogHeader>
+
+          {reopenTarget && (
+            <div className="space-y-4 pt-2">
+              <div className="rounded-md bg-muted p-3 text-xs">
+                <p className="font-semibold text-foreground">{reopenTarget.title}</p>
+                <p className="text-muted-foreground mt-0.5">
+                  Tracking ID: {reopenTarget.id} · Department: {reopenTarget.department}
+                </p>
+              </div>
+
+              <div>
+                <label htmlFor="complaints-reopen-input" className="block text-xs font-semibold mb-1.5">
+                  Objection Reason & Notes
+                </label>
+                <textarea
+                  id="complaints-reopen-input"
+                  rows={4}
+                  className="form-field text-xs resize-none"
+                  placeholder="Detail why you are dissatisfied with the proposed remediation..."
+                  value={reopenReason}
+                  onChange={(e) => setReopenReason(e.target.value)}
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-border">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setReopenTarget(null);
+                    setReopenReason("");
+                  }}
+                  disabled={busyAction}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  disabled={busyAction || reopenReason.trim().length < 8}
+                  onClick={handleReopenCase}
+                >
+                  <RotateCcw className="size-3 mr-1" />
+                  {busyAction ? "Reopening..." : "Reopen Case"}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -461,6 +864,12 @@ export function SubmitPage({ initialCategory }: { initialCategory?: string }) {
         ...(old ?? []),
       ]);
       localStorage.removeItem("civic-draft");
+      try {
+        const existingMy = JSON.parse(sessionStorage.getItem("civic_my_complaints") || "[]");
+        sessionStorage.setItem("civic_my_complaints", JSON.stringify([row.id, ...existingMy]));
+      } catch {
+        // ignore
+      }
       toast.success(isDemo ? "Demonstration complaint created." : "Complaint submitted.");
     } catch (error) {
       setFailure(error instanceof Error ? error.message : "Submission failed. Please retry.");
@@ -991,47 +1400,61 @@ export function ComplaintDetail({ id }: { id: string }) {
               </p>
             )}
           </div>
-          {row.resolution && (
-            <section className="mb-8 border-y border-warning/25 bg-warning-soft px-5 py-6">
-              <h2 className="flex items-center gap-2 text-sm font-bold text-warning">
-                <ClipboardCheck className="size-5" />
-                {t("resolutionTitle")}
-              </h2>
-              <p className="mt-4 text-sm leading-relaxed">{row.resolution.notes}</p>
-              <p className="mt-3 text-xs text-muted-foreground">
-                Submitted by {row.resolution.officer}
+          {/* 7-DAY REVIEW WINDOW: Active if status is 'review' or resolution is present */}
+          {(row.status === "review" || row.resolution) && row.status !== "resolved" && row.status !== "challenged" && row.status !== "reopened" && (
+            <section className="mb-8 rounded-lg border-2 border-warning/40 bg-warning-soft px-5 py-6">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h2 className="flex items-center gap-2 text-sm font-bold text-warning">
+                  <ClipboardCheck className="size-5" />
+                  7-Day Citizen Resolution Review Window Active
+                </h2>
+                <span className="rounded-full bg-warning/20 px-2.5 py-0.5 text-[10px] font-bold text-warning">
+                  ⏱{" "}
+                  {Math.max(
+                    0,
+                    Math.ceil(
+                      (new Date(row.resolution?.deadline || Date.now() + 7 * 86400000).getTime() -
+                        Date.now()) /
+                        86400000,
+                    ),
+                  )}{" "}
+                  days remaining
+                </span>
+              </div>
+              <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+                The municipal team has completed physical work on this complaint. You have up to 7 days to inspect the site and confirm your satisfaction, or object to reopen the case.
               </p>
-              <div className="mt-4">
-                <h3 className="text-xs font-semibold">Officer evidence</h3>
-                {row.resolution.evidence.length ? (
-                  <PhotoGrid photos={row.resolution.evidence} />
+
+              <div className="mt-4 rounded-md bg-surface p-4 border border-border">
+                <h3 className="text-xs font-semibold text-foreground">Officer Remediation Remarks</h3>
+                <p className="mt-1 text-sm leading-relaxed text-foreground">
+                  {row.resolution?.notes || "Remediation works submitted for citizen approval."}
+                </p>
+                <p className="mt-2 text-[11px] text-muted-foreground">
+                  Submitted by {row.resolution?.officer || "Field Duty Officer"} · {row.department}
+                </p>
+
+                {row.resolution?.evidence && row.resolution.evidence.length > 0 ? (
+                  <div className="mt-4">
+                    <h4 className="text-xs font-semibold text-muted-foreground">Officer Evidence Photos</h4>
+                    <PhotoGrid photos={row.resolution.evidence} />
+                  </div>
                 ) : (
-                  <p className="mt-2 text-xs text-warning">
-                    No evidence photos attached. This proposal cannot be verified.
+                  <p className="mt-2 text-[11px] text-muted-foreground italic">
+                    No officer photos attached with this submission.
                   </p>
                 )}
               </div>
-              <p className="mt-4 flex items-center gap-2 text-xs text-warning">
-                <Clock3 className="size-4" />
-                Review deadline: {new Date(row.resolution.deadline).toLocaleDateString(
-                  "en-GB",
-                )} ·{" "}
-                {Math.max(
-                  0,
-                  Math.ceil((new Date(row.resolution.deadline).getTime() - Date.now()) / 86400000),
-                )}{" "}
-                days remaining
-              </p>
-              <div className="mt-5 flex flex-wrap gap-3">
+
+              <div className="mt-5 flex flex-wrap items-center gap-3">
                 <Button
-                  disabled={row.resolution.evidence.length === 0 || busy}
+                  disabled={busy}
+                  className="bg-success hover:bg-success/90 text-success-foreground font-semibold"
                   onClick={async () => {
                     setBusy(true);
                     try {
-                      await civicApi.update(row.id, {}, "confirm");
-                      toast.success(
-                        "Confirmation sent for evidence verification. Status remains pending until verified by the service.",
-                      );
+                      await civicApi.update(row.id, { note: "Citizen verified satisfaction with resolution." }, "confirm");
+                      toast.success("You confirmed satisfaction! The complaint is now verified and closed.");
                       await queryClient.invalidateQueries({ queryKey: ["complaints"] });
                     } catch (error) {
                       toast.error(error instanceof Error ? error.message : "Confirmation failed.");
@@ -1040,30 +1463,59 @@ export function ComplaintDetail({ id }: { id: string }) {
                     }
                   }}
                 >
-                  <Check />
-                  {t("confirm")}
+                  <Check className="size-4 mr-1.5" />
+                  Confirm Satisfaction & Close Case
                 </Button>
-                <Button variant="outline" onClick={() => setReviewOpen(true)}>
-                  <ShieldCheck />
-                  {t("challenge")}
+                <Button
+                  variant="outline"
+                  className="text-destructive hover:bg-destructive/10 border-destructive/30"
+                  onClick={() => setReviewOpen(true)}
+                  disabled={busy}
+                >
+                  <RotateCcw className="size-4 mr-1.5" />
+                  Object & Reopen Case
                 </Button>
               </div>
             </section>
           )}
-          {row.challenge && (
-            <section className="mb-8 border-y border-border py-5">
-              <h2 className="text-sm font-bold">Independent challenge review</h2>
-              <p className="mt-3 text-sm text-muted-foreground">{row.challenge.reason}</p>
-              <PhotoGrid photos={row.challenge.evidence} />
-              <div className="mt-4">
-                <StatusBadge status={row.status} />
-                <p className="mt-3 text-xs text-muted-foreground">
-                  {row.challenge.outcome ??
-                    "Awaiting an independent reviewer. The original officer is excluded from this review."}
+
+          {/* RESOLVED STATUS BANNER */}
+          {row.status === "resolved" && (
+            <section className="mb-8 rounded-lg border border-success/30 bg-success-soft p-5">
+              <div className="flex items-center gap-2 text-success">
+                <CheckCheck className="size-5" />
+                <h3 className="text-sm font-bold">Citizen Satisfaction Confirmed · Case Closed</h3>
+              </div>
+              <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+                This grievance has been physically resolved by <strong>{row.department}</strong> and verified satisfactory within the 7-day citizen review window.
+              </p>
+              {row.resolution?.notes && (
+                <p className="mt-2 text-xs text-foreground font-medium">
+                  <strong>Final Resolution Remarks:</strong> {row.resolution.notes}
                 </p>
-              </div>
+              )}
             </section>
           )}
+
+          {/* REOPENED / CHALLENGED STATUS BANNER */}
+          {(row.status === "challenged" || row.status === "reopened") && (
+            <section className="mb-8 rounded-lg border border-warning/40 bg-warning-soft p-5">
+              <div className="flex items-center gap-2 text-warning">
+                <RotateCcw className="size-5" />
+                <h3 className="text-sm font-bold">Case Reopened by Citizen Objection</h3>
+              </div>
+              <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+                The citizen reported that the problem was not satisfactorily solved. This case has been escalated to department supervisors for site re-inspection.
+              </p>
+              {row.challenge?.reason && (
+                <div className="mt-3 rounded bg-surface p-3 border border-border text-xs">
+                  <span className="font-semibold text-foreground">Citizen Objection:</span>
+                  <p className="mt-1 text-muted-foreground">{row.challenge.reason}</p>
+                </div>
+              )}
+            </section>
+          )}
+
           <Timeline row={row} />
         </div>
         <aside>
@@ -1071,19 +1523,44 @@ export function ComplaintDetail({ id }: { id: string }) {
             <div className="flex items-center gap-2 text-primary">
               <ShieldCheck className="size-5" />
               <span className="text-[10px] font-semibold uppercase tracking-[1px]">
-                {t("lead")}
+                Accountable Department
               </span>
             </div>
             <h2 className="mt-4 text-base font-bold">{row.department}</h2>
             <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
-              This department is responsible for coordinating your complaint.
+              This municipal department is responsible for remediating and coordinating this complaint.
             </p>
             <div className="mt-4 border-t border-border pt-4 text-xs text-muted-foreground">
               {row.ward}
             </div>
+
+            {/* SLA Tracker */}
+            {row.slaDeadline && (
+              <div className="mt-4 rounded-md border border-border bg-secondary/50 p-3 text-xs">
+                <span className="font-semibold text-foreground">SLA Target:</span>
+                <p className="mt-1 text-muted-foreground">
+                  {new Date(row.slaDeadline).toLocaleDateString("en-GB", {
+                    day: "2-digit",
+                    month: "short",
+                    year: "numeric",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
+                </p>
+                {row.slaOverdue ? (
+                  <span className="mt-1 inline-block rounded bg-destructive/15 px-2 py-0.5 text-[10px] font-bold text-destructive">
+                    SLA OVERDUE · Escalated
+                  </span>
+                ) : row.slaSecondsRemaining !== undefined ? (
+                  <span className="mt-1 inline-block rounded bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
+                    ⏱ {Math.max(0, Math.floor(row.slaSecondsRemaining / 3600))} hours remaining
+                  </span>
+                ) : null}
+              </div>
+            )}
           </section>
-          <section className="panel">
-            <div className="p-4 text-xs font-semibold">Reported location</div>
+          <section className="panel mt-5">
+            <div className="p-4 text-xs font-semibold">Incident Location</div>
             <LocationMap lat={row.lat} lng={row.lng} />
             <p className="p-4 text-xs text-muted-foreground">{row.address}</p>
           </section>

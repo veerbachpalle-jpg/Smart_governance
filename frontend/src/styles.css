@@ -199,6 +199,7 @@
 .map-container.large { height: 350px; }
 .leaflet-container { font-family: var(--font-sans); }
 .civic-map-pin { background: var(--primary); border: 3px solid var(--primary-foreground); box-shadow: 0 2px 8px color-mix(in oklch, var(--foreground) 25%, transparent); border-radius: 50%; }
+.civic-dynamic-pin { background: transparent !important; border: none !important; }
 .form-field { width: 100%; border: 1px solid var(--input); border-radius: 6px; background: var(--surface); color: var(--foreground); min-height: 44px; padding: 11px 13px; font-size: 14px; }
 .form-field::placeholder { color: var(--muted-foreground); }
 .step-index { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; background: var(--muted); color: var(--muted-foreground); font-size: 12px; font-weight: 600; flex-shrink: 0; }

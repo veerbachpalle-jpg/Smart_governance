@@ -530,7 +530,7 @@ export const civicApi = {
     demoRows = [row, ...demoRows];
     return row;
   },
-  async update(id: string, changes: Partial<Complaint>, action: string): Promise<Complaint> {
+  async update(id: string, changes: Partial<Complaint> & { note?: string }, action: string): Promise<Complaint> {
     if (!isDemo) {
       const row = await this.list().then((items) => items.find((item) => item.id === id));
       if (!row?.backendId) throw new ApiError("Complaint not found.", 404);
