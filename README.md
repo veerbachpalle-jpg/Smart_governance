@@ -323,7 +323,7 @@ Tests should be run in the target development environment before submitting chan
 
 ## Deployment
 
-The checked-in [`render.yaml`](render.yaml) is a reproducible prototype backend deployment for Render. It provisions a FastAPI web service, PostgreSQL, and Redis-compatible Key Value in Singapore, runs Alembic before deployment, generates the JWT secret, and starts both the API and ARQ worker. Import the repository as a Render Blueprint, then verify `/health`, `/ready`, and `/docs`.
+The checked-in [`render.yaml`](render.yaml) is a reproducible prototype backend deployment for Render. It provisions a FastAPI web service, PostgreSQL, and Redis-compatible Key Value in Singapore, generates the JWT secret, and starts both the API and ARQ worker. Because Render's free web tier does not support pre-deploy commands, the single-instance prototype supervisor runs repeatable Alembic migrations and idempotent demo seeding before starting those processes. Import the repository as a Render Blueprint, then verify `/health`, `/ready`, and `/docs`.
 
 The frontend is connected to Vercel/Lovable from the `frontend/` root. For a connected live backend, configure these Vercel production variables and redeploy:
 

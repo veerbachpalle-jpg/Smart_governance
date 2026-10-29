@@ -15,6 +15,12 @@ import time
 
 def main() -> int:
     port = os.environ.get("PORT", "8000")
+    # Render's free web tier does not support pre-deploy commands. This
+    # prototype runs repeatable migrations and idempotent demo seeding before
+    # either long-lived process starts. Keep a single instance to avoid races.
+    subprocess.run([sys.executable, "-m", "alembic", "upgrade", "head"], check=True)
+    subprocess.run([sys.executable, "-m", "app.db.seed"], check=True)
+
     processes = [
         subprocess.Popen(
             [
