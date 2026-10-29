@@ -182,7 +182,16 @@ interface BackendComplaint {
   sla_seconds_remaining: number | null;
   is_sla_overdue: boolean;
   department_name: string | null;
+  department_id: string | null;
   ward_number: number | null;
+}
+
+export interface MunicipalDepartment {
+  id: string;
+  code: string;
+  name: string;
+  description: string | null;
+  is_active: boolean;
 }
 
 interface BackendTrendingIssue {
@@ -270,6 +279,7 @@ function toComplaint(row: BackendComplaint): Complaint {
     department:
       row.department_name ??
       (status === "submitted" ? "Awaiting human assignment" : "Municipal service team"),
+    ...(row.department_id ? { departmentId: row.department_id } : {}),
     priority:
       row.priority_band === "CRITICAL"
         ? "Critical"
@@ -315,6 +325,62 @@ async function uploadDataUrl(dataUrl: string, index: number): Promise<string> {
 }
 
 export const civicApi = {
+  async departments(): Promise<MunicipalDepartment[]> {
+    if (isDemo) {
+      return [];
+    }
+    return request<MunicipalDepartment[]>("/users/departments");
+  },
+  async decideTriage(
+    complaint: Complaint,
+    recommendation: "Department routing" | "Priority",
+    decision: "Accept" | "Override" | "Reject",
+    reason: string,
+    overrideValue?: string,
+  ): Promise<void> {
+    if (isDemo) return;
+    if (!complaint.backendId) throw new ApiError("Complaint not found.", 404);
+    const decisionPath = decision.toLowerCase();
+    if (recommendation === "Department routing") {
+      const body =
+        decision === "Accept"
+          ? { notes: reason || undefined }
+          : decision === "Override"
+            ? { department_id: overrideValue, reason }
+            : { reason };
+      await request(`/complaints/${complaint.backendId}/routing/${decisionPath}`, {
+        method: "POST",
+        body: JSON.stringify(body),
+      });
+      return;
+    }
+    const body =
+      decision === "Accept"
+        ? { notes: reason || undefined }
+        : decision === "Override"
+          ? { priority: overrideValue, reason }
+          : { reason };
+    await request(`/complaints/${complaint.backendId}/priority/${decisionPath}`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+  },
+  async submitManualTriage(
+    complaint: Complaint,
+    input: { departmentId: string; priority: "CRITICAL" | "HIGH" | "MEDIUM" | "LOW"; notes: string },
+  ): Promise<void> {
+    if (isDemo) return;
+    if (!complaint.backendId) throw new ApiError("Complaint not found.", 404);
+    await request(`/triage/manual/${complaint.backendId}`, {
+      method: "POST",
+      body: JSON.stringify({
+        category: complaint.category,
+        department_id: input.departmentId,
+        priority: input.priority,
+        notes: input.notes,
+      }),
+    });
+  },
   async list(): Promise<Complaint[]> {
     if (!isDemo) {
       if (!tokens) return [];

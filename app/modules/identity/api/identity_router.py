@@ -4,7 +4,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.dependencies import get_current_user, require_roles
 from app.db.session import get_db
 from app.modules.identity.models.user import User
+from app.modules.identity.repository.identity_repository import DepartmentRepository
 from app.modules.identity.schemas.identity import (
+    DepartmentResponse,
     LoginRequest,
     RefreshRequest,
     RegisterRequest,
@@ -16,6 +18,29 @@ from app.modules.identity.service.identity_service import IdentityService
 
 auth_router = APIRouter(prefix="/auth", tags=["Identity & Auth"])
 users_router = APIRouter(prefix="/users", tags=["Users"])
+
+
+@users_router.get(
+    "/departments",
+    response_model=list[DepartmentResponse],
+    status_code=status.HTTP_200_OK,
+    summary="List active municipal departments for staff routing decisions",
+)
+async def list_departments(
+    current_user: User = Depends(
+        require_roles(
+            UserRole.OFFICER,
+            UserRole.DEPARTMENT_LEAD,
+            UserRole.SUPERVISOR,
+            UserRole.ADMIN,
+            UserRole.AUDITOR,
+        )
+    ),
+    session: AsyncSession = Depends(get_db),
+) -> list[DepartmentResponse]:
+    del current_user
+    departments = await DepartmentRepository(session).list_all()
+    return [DepartmentResponse.model_validate(department) for department in departments if department.is_active]
 
 
 @auth_router.post(

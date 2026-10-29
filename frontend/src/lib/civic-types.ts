@@ -18,6 +18,7 @@ export interface Complaint {
   id: string;
   backendId?: string;
   caseId?: string;
+  departmentId?: string;
   title: string;
   description: string;
   category: Category;

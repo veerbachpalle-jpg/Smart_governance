@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link } from "@tanstack/react-router";
-import { useSuspenseQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useSuspenseQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { useSimulation } from "@/lib/civic-sim";
 import {
@@ -346,7 +346,14 @@ export function StaffCase({ id }: { id: string }) {
   const [evidence, setEvidence] = useState<string[]>([]);
   const [manual, setManual] = useState(false);
   const [department, setDepartment] = useState("");
+  const [departmentId, setDepartmentId] = useState("");
   const [priority, setPriority] = useState("Normal");
+  const [overrideValue, setOverrideValue] = useState("");
+  const { data: departments = [] } = useQuery({
+    queryKey: ["municipal-departments"],
+    queryFn: civicApi.departments,
+    enabled: !isDemo,
+  });
   if (!row)
     return (
       <div className="page-container">
@@ -381,28 +388,34 @@ export function StaffCase({ id }: { id: string }) {
   async function decide() {
     if (!row) return;
     if (decision !== "Accept" && reason.trim().length < 10) return;
-    const title = `${recommendation} recommendation ${decision.toLowerCase()}`;
-    await update(
-      {
-        activity: [
-          {
-            title,
-            note: reason || "Human reviewer accepted the recommendation.",
-            department: row.department,
-            date: new Date().toISOString().slice(0, 10),
-            public: false,
-          },
-          ...row.activity,
-        ],
-      },
-      "triage-decision",
-    );
-    setRecommendation("");
+    setBusy(true);
+    try {
+      await civicApi.decideTriage(
+        row,
+        recommendation as "Department routing" | "Priority",
+        decision as "Accept" | "Override" | "Reject",
+        reason,
+        overrideValue,
+      );
+      await queryClient.invalidateQueries({ queryKey: ["complaints"] });
+      toast.success(isDemo ? "Sample case updated." : "Triage decision recorded.");
+      setRecommendation("");
+      setReason("");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not record the decision.");
+    } finally {
+      setBusy(false);
+    }
   }
   const choose = (rec: string, kind: string) => {
     setRecommendation(rec);
     setDecision(kind);
     setReason("");
+    setOverrideValue(
+      rec === "Department routing"
+        ? row.departmentId ?? departments.find((item) => item.name === row.department)?.id ?? ""
+        : row.priorityBand ?? (row.priority === "Critical" ? "CRITICAL" : row.priority === "High" ? "HIGH" : "MEDIUM"),
+    );
   };
   return (
     <div className="page-container fade-in">
@@ -465,12 +478,18 @@ export function StaffCase({ id }: { id: string }) {
                 Department
                 <select
                   className="form-field mt-2"
-                  value={department}
-                  onChange={(e) => setDepartment(e.target.value)}
+                  value={isDemo ? department : departmentId}
+                  onChange={(e) => {
+                    if (isDemo) setDepartment(e.target.value);
+                    else {
+                      setDepartmentId(e.target.value);
+                      setDepartment(departments.find((item) => item.id === e.target.value)?.name ?? "");
+                    }
+                  }}
                 >
                   <option value="">Select department</option>
-                  {categories.map((c) => (
-                    <option key={c.department}>{c.department}</option>
+                  {(isDemo ? categories.map((item) => ({ id: item.department, name: item.department })) : departments).map((item) => (
+                    <option key={item.id} value={item.id}>{item.name}</option>
                   ))}
                 </select>
               </label>
@@ -495,27 +514,27 @@ export function StaffCase({ id }: { id: string }) {
                 />
               </label>
               <Button
-                disabled={!department || reason.trim().length < 10 || busy}
-                onClick={() =>
-                  update(
-                    {
-                      department,
-                      priority: priority as Complaint["priority"],
-                      status: "in_progress",
-                      activity: [
-                        {
-                          title: "Manually triaged",
-                          note: reason,
-                          department,
-                          date: new Date().toISOString().slice(0, 10),
-                          public: true,
-                        },
-                        ...row.activity,
-                      ],
-                    },
-                    "manual-triage",
-                  )
-                }
+                disabled={!(isDemo ? department : departmentId) || reason.trim().length < 10 || busy}
+                onClick={async () => {
+                  setBusy(true);
+                  try {
+                    if (isDemo) {
+                      await update({ department, priority: priority as Complaint["priority"], status: "in_progress" }, "manual-triage");
+                    } else {
+                      await civicApi.submitManualTriage(row, {
+                        departmentId,
+                        priority: priority === "Critical" ? "CRITICAL" : priority === "High" ? "HIGH" : "MEDIUM",
+                        notes: reason,
+                      });
+                      await queryClient.invalidateQueries({ queryKey: ["complaints"] });
+                      toast.success("Manual triage recorded.");
+                    }
+                  } catch (error) {
+                    toast.error(error instanceof Error ? error.message : "Could not save manual triage.");
+                  } finally {
+                    setBusy(false);
+                  }
+                }}
               >
                 Save human decision
                 <Save />
@@ -609,6 +628,8 @@ export function StaffCase({ id }: { id: string }) {
                   className="mt-4"
                   onClick={() => {
                     setManual(true);
+                    setDepartmentId(row.departmentId ?? departments.find((item) => item.name === row.department)?.id ?? "");
+                    setDepartment(row.department);
                     toast.info("Manual triage selected.");
                   }}
                 >
@@ -717,9 +738,38 @@ export function StaffCase({ id }: { id: string }) {
             <DialogTitle>
               {decision} {recommendation.toLowerCase()} suggestion
             </DialogTitle>
-            <DialogDescription>
-              This records a human decision. AI output is not an official finding.
-            </DialogDescription>
+          <DialogDescription>
+            This records a human decision. AI output is not an official finding.
+          </DialogDescription>
+          {decision === "Override" && recommendation === "Department routing" && (
+            <label className="text-xs font-semibold">
+              Replacement department
+              <select
+                className="form-field mt-2"
+                value={overrideValue}
+                onChange={(event) => setOverrideValue(event.target.value)}
+              >
+                <option value="">Select department</option>
+                {departments.map((item) => (
+                  <option key={item.id} value={item.id}>{item.name}</option>
+                ))}
+              </select>
+            </label>
+          )}
+          {decision === "Override" && recommendation === "Priority" && (
+            <label className="text-xs font-semibold">
+              Replacement priority
+              <select
+                className="form-field mt-2"
+                value={overrideValue}
+                onChange={(event) => setOverrideValue(event.target.value)}
+              >
+                {["CRITICAL", "HIGH", "MEDIUM", "LOW"].map((item) => (
+                  <option key={item} value={item}>{item}</option>
+                ))}
+              </select>
+            </label>
+          )}
           </DialogHeader>
           <label htmlFor="decision-reason" className="text-xs font-semibold">
             Written reasoning {decision === "Accept" ? "(optional)" : "(required)"}
@@ -731,7 +781,7 @@ export function StaffCase({ id }: { id: string }) {
             onChange={(e) => setReason(e.target.value)}
           />
           <Button
-            disabled={busy || (decision !== "Accept" && reason.trim().length < 10)}
+            disabled={busy || (decision !== "Accept" && (reason.trim().length < 10 || (decision === "Override" && !overrideValue)))}
             onClick={decide}
           >
             Save decision
