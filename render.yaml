@@ -7,7 +7,7 @@ services:
     dockerfilePath: ./Dockerfile
     dockerContext: .
     dockerCommand: python scripts/start_render.py
-    preDeployCommand: alembic upgrade head
+    preDeployCommand: alembic upgrade head && python -m app.db.seed
     healthCheckPath: /health
     autoDeployTrigger: commit
     envVars:
