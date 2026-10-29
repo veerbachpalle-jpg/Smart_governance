@@ -277,10 +277,11 @@ class WhatsAppService:
             )
 
         lines = [f"📋 Your Recent Grievances ({len(items)} found):\n"]
-        for idx, c in enumerate(items, start=1):
+        for idx, ranked in enumerate(items, start=1):
+            complaint = ranked.complaint
             lines.append(
-                f"{idx}. [{c.tracking_number}] {c.original_title[:40]}\n"
-                f"   Status: {c.status} | Ward: {c.ward_name or 'Unassigned'}"
+                f"{idx}. [{complaint.tracking_number}] {complaint.original_title[:40]}\n"
+                f"   Status: {complaint.status} | Ward: {complaint.ward_name or 'Unassigned'}"
             )
         lines.append("\nTrack anytime: https://smart-governance-woad.vercel.app/track")
         return "\n".join(lines)
