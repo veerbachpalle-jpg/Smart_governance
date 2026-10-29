@@ -64,6 +64,11 @@ class Settings(BaseSettings):
     AI_CIRCUIT_BREAKER_FAILURES: int = Field(default=3)
     AI_CIRCUIT_BREAKER_RESET_SECONDS: float = Field(default=60.0)
 
+    # WhatsApp Integration
+    WHATSAPP_VERIFY_TOKEN: str = Field(default="smart_governance_wa_verify")
+    WHATSAPP_ACCESS_TOKEN: str | None = Field(default=None)
+    WHATSAPP_PHONE_NUMBER_ID: str | None = Field(default=None)
+
     # Security: CORS & Rate Limiting
     CORS_ORIGINS: str = Field(
         default="http://localhost:3000,http://localhost:5173,http://localhost:8000"

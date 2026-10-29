@@ -30,6 +30,7 @@ from app.modules.complaints.api import complaints_router
 from app.modules.duplicates.api import duplicates_router
 from app.modules.evaluation.api import evaluation_router
 from app.modules.identity.api import auth_router, users_router
+from app.modules.integrations.whatsapp.router import whatsapp_router
 from app.modules.priority.api import priority_router
 from app.modules.routing.api import routing_router
 
@@ -134,3 +135,4 @@ app.include_router(challenges_router, prefix="/api/v1")
 app.include_router(triage_router, prefix="/api/v1")
 app.include_router(chaos_router, prefix="/api/v1")
 app.include_router(evaluation_router, prefix="/api/v1")
+app.include_router(whatsapp_router, prefix="/api/v1")
