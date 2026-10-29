@@ -50,11 +50,15 @@ class Settings(BaseSettings):
     # override these without changing code when a provider model is rotated.
     GEMINI_MODEL: str = Field(default="gemini-3.8-flash")
     GEMINI_EMBEDDING_MODEL: str = Field(default="gemini-embedding-2")
-
     AI_CONFIDENCE_THRESHOLD: float = Field(default=0.7)
     AI_TIMEOUT_SECONDS: float = Field(default=10.0)
     AI_CIRCUIT_BREAKER_FAILURES: int = Field(default=3)
     AI_CIRCUIT_BREAKER_RESET_SECONDS: float = Field(default=60.0)
+
+    # WhatsApp Integration
+    WHATSAPP_VERIFY_TOKEN: str = Field(default="smart_governance_wa_verify")
+    WHATSAPP_ACCESS_TOKEN: str | None = Field(default=None)
+    WHATSAPP_PHONE_NUMBER_ID: str | None = Field(default=None)
 
     # Security: CORS & Rate Limiting
     CORS_ORIGINS: str = Field(

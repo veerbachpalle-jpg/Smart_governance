@@ -65,6 +65,8 @@ PUBLIC_PATHS = {
     ("POST", "/api/v1/auth/refresh"),
     ("GET", "/api/v1/complaints/{identifier}/tracking"),
     ("GET", "/api/v1/complaints/nearby-similar"),
+    ("GET", "/api/v1/integrations/whatsapp/webhook"),
+    ("POST", "/api/v1/integrations/whatsapp/webhook"),
 }
 
 

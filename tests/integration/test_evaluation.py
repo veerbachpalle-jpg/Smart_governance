@@ -12,9 +12,11 @@ from app.modules.evaluation.service.evaluator import EvaluationRunner
 async def test_evaluation_dataset_validity():
     """Validates that data/eval/dataset_v1.jsonl and SCHEMA.md meet all Part 9 requirements."""
     schema_path = Path("data/eval/SCHEMA.md")
+    if not schema_path.exists() and Path("data/eval/schema.md").exists():
+        schema_path = Path("data/eval/schema.md")
     dataset_path = Path("data/eval/dataset_v1.jsonl")
 
-    assert schema_path.exists(), "data/eval/SCHEMA.md must exist"
+    assert schema_path.exists(), "data/eval/SCHEMA.md (or schema.md) must exist"
     assert dataset_path.exists(), "data/eval/dataset_v1.jsonl must exist"
 
     samples = []

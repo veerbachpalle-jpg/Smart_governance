@@ -32,12 +32,15 @@ services:
       dockerfile: Dockerfile
     container_name: grievance_worker
     restart: unless-stopped
-    command: python -c "import time; print('Worker placeholder initialized. Waiting for tasks...'); time.sleep(999999)"
+    command: arq app.core.worker.WorkerSettings
     environment:
       - ENVIRONMENT=development
       - LOG_LEVEL=INFO
       - DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres:5432/grievance_db
       - REDIS_URL=redis://redis:6379/0
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - GEMINI_MODEL=${GEMINI_MODEL:-gemini-3.8-flash}
+      - GEMINI_EMBEDDING_MODEL=${GEMINI_EMBEDDING_MODEL:-gemini-embedding-2}
     depends_on:
       postgres:
         condition: service_healthy

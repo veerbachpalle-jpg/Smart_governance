@@ -24,6 +24,7 @@ Smart Governance is a municipal grievance management prototype designed to help 
 - [Demo accounts](#demo-accounts)
 - [API overview](#api-overview)
 - [Testing and code quality](#testing-and-code-quality)
+- [Deployment](#deployment)
 - [Current limitations](#current-limitations)
 - [Roadmap](#roadmap)
 
@@ -91,7 +92,7 @@ flowchart TD
     AI --> Mock[Deterministic mock provider]
 ```
 
-**Important runtime note:** The repository contains outbox/worker code, but the current Docker Compose `worker` service is a placeholder process and does not run the ARQ worker. Background event processing and scheduled jobs therefore need to be wired up before relying on asynchronous workflows in a deployed environment.
+The Docker Compose stack runs an ARQ worker for transactional outbox events, expired citizen-review windows, and challenge SLA checks. The Render prototype profile runs the API and worker under one supervisor process to stay within a single compute service; split them before horizontally scaling the API.
 
 ## Technology Stack
 
@@ -245,8 +246,8 @@ The root `.env.example` documents the main local settings. Important backend set
 |---|---|
 | `DATABASE_URL` | Async SQLAlchemy database connection string |
 | `REDIS_URL` | Redis connection string |
-| `MINIO_ENDPOINT` | MinIO endpoint used for attachments |
-| `MINIO_ROOT_USER`, `MINIO_ROOT_PASSWORD` | MinIO development credentials |
+| `STORAGE_BACKEND`, `LOCAL_UPLOAD_DIR` | Attachment storage mode and local/persistent upload path |
+| `MINIO_ENDPOINT`, `MINIO_ROOT_USER`, `MINIO_ROOT_PASSWORD` | Reserved MinIO configuration; the current attachment implementation uses local storage |
 | `JWT_SECRET_KEY` | JWT signing secret; replace the development value before deployment |
 | `ACCESS_TOKEN_EXPIRE_MINUTES`, `REFRESH_TOKEN_EXPIRE_DAYS` | Token lifetimes |
 | `AI_ENABLED` | Enables or disables AI-assisted processing |
@@ -320,11 +321,27 @@ npm run build
 
 Tests should be run in the target development environment before submitting changes. The repository contains unit and integration tests; test results are not represented as passing unless the commands have been run successfully.
 
+## Deployment
+
+The checked-in [`render.yaml`](render.yaml) is a reproducible prototype backend deployment for Render. It provisions a FastAPI web service, PostgreSQL, and Redis-compatible Key Value in Singapore, generates the JWT secret, and starts both the API and ARQ worker. Because Render's free web tier does not support pre-deploy commands, the single-instance prototype supervisor runs repeatable Alembic migrations and idempotent demo seeding before starting those processes. Import the repository as a Render Blueprint, then verify `/health`, `/ready`, and `/docs`.
+
+The frontend is connected to Vercel/Lovable from the `frontend/` root. For a connected live backend, configure these Vercel production variables and redeploy:
+
+```dotenv
+VITE_API_BASE_URL=https://<backend-host>/api/v1
+VITE_USE_MOCKS=false
+```
+
+Keep `VITE_USE_MOCKS=true` for the public walkthrough until the backend URL, CORS origin, accounts, and data-retention policy have been validated. The frontend deliberately remains in demonstration mode when no API URL is configured.
+
+The free Render profile is suitable only for a hackathon demonstration: services can sleep, Redis data is non-persistent, the free database is time-limited under Render's current terms, and local uploads are ephemeral unless a persistent disk or object-storage adapter is added.
+
 ## Current Limitations
 
 - The hosted frontend is a demonstration with sample data, not a live government service.
-- Some frontend actions are still mock-only or await full API-contract integration. The backend and frontend should be tested together before presenting Original Mode as a complete end-to-end deployment.
-- The Docker Compose worker is currently a placeholder. Configure and run the ARQ worker and schedule its polling jobs before depending on background outbox processing or automated review-window/SLA jobs.
+- Live sign-in, complaint listing/submission, photo upload, public tracking, and support use backend-compatible contracts. Staff decisions, case transitions, resolution review, and challenges are still demo-only in the frontend even though backend endpoints exist.
+- Attachment bytes use local filesystem storage. The prototype deployment needs a persistent disk or a completed object-storage adapter before uploads can be treated as durable.
+- The single-service Render supervisor is a cost-saving prototype fallback. Use separate API and worker services before scaling beyond one API instance.
 - Notification delivery and real municipal channels, such as official SMS, email, or government systems, require deployment-specific integration.
 - Seed credentials, JWT defaults, and Compose service passwords are for local development only.
 - No official municipal boundaries, municipal integrations, or production service-level commitments are configured in this repository.
@@ -332,7 +349,7 @@ Tests should be run in the target development environment before submitting chan
 ## Roadmap
 
 - Complete and test the frontend/backend API integration across all user workflows.
-- Wire up the ARQ worker, polling schedule, retries, and scheduled review/SLA tasks in the deployment configuration.
+- Split the ARQ worker into a separately monitored service for production scaling.
 - Add production secret management, deployment profiles, monitoring, and operational alerting.
 - Integrate official municipal ward boundaries and department data.
 - Add real notification channels and measure AI recommendation quality on appropriately governed, anonymised datasets.
