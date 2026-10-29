@@ -42,3 +42,22 @@ def test_jwt_tampered_token() -> None:
     with pytest.raises(UnauthorizedError) as exc_info:
         decode_token(tampered_token)
     assert exc_info.value.code == "INVALID_TOKEN"
+
+
+def test_jwt_safe_algorithm_fallback() -> None:
+    from app.config import settings
+
+    original = settings.JWT_ALGORITHM
+    try:
+        settings.JWT_ALGORITHM = '"HS256"'
+        token = create_access_token(subject="user-safe", role="citizen")
+        payload = decode_token(token)
+        assert payload["sub"] == "user-safe"
+
+        settings.JWT_ALGORITHM = "unsupported_algo"
+        token2 = create_access_token(subject="user-fallback", role="citizen")
+        payload2 = decode_token(token2)
+        assert payload2["sub"] == "user-fallback"
+    finally:
+        settings.JWT_ALGORITHM = original
+

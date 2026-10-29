@@ -25,12 +25,18 @@ services:
           property: connectionString
       - key: JWT_SECRET_KEY
         generateValue: true
+      - key: JWT_ALGORITHM
+        value: HS256
       - key: CORS_ORIGINS
         value: https://smart-governance-woad.vercel.app
       - key: RATE_LIMIT_ENABLED
         value: "true"
       - key: AI_ENABLED
         value: "true"
+      - key: AI_PROVIDER
+        value: groq
+      - key: GROQ_API_KEY
+        sync: false
       - key: STORAGE_BACKEND
         value: local
       - key: LOCAL_UPLOAD_DIR

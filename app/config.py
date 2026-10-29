@@ -33,8 +33,26 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(default=30)
     REFRESH_TOKEN_EXPIRE_DAYS: int = Field(default=7)
 
+    @field_validator("JWT_ALGORITHM", mode="before")
+    @classmethod
+    def normalize_jwt_algorithm(cls, v: Any) -> str:
+        if isinstance(v, str):
+            cleaned = v.strip().strip("'\"").upper()
+            if cleaned in {"HS256", "HS384", "HS512"}:
+                return cleaned
+        return "HS256"
+
     # AI Assist & Guardrails
     AI_ENABLED: bool = Field(default=True)
+
+    # Provider selection: 'groq' (default) | 'gemini' | 'mock'
+    AI_PROVIDER: str = Field(default="groq")
+
+    # --- Groq (Llama 3.3-70B / gpt-oss-120b on Groq LPU cloud) ---
+    GROQ_API_KEY: str | None = Field(default=None)
+    GROQ_MODEL: str = Field(default="openai/gpt-oss-120b")
+
+    # --- Google Gemini (kept as fallback) ---
     GEMINI_API_KEY: str | None = Field(default=None)
     # Keep defaults on currently supported stable Gemini endpoints. Deployments can
     # override these without changing code when a provider model is rotated.
