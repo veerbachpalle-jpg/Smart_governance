@@ -17,7 +17,8 @@ export function setDemoMode(value: boolean) {
   }
 }
 
-const base = import.meta.env["VITE_API_BASE_URL"]?.replace(/\/$/, "") ?? "";
+const rawBase = import.meta.env["VITE_API_BASE_URL"]?.replace(/\/$/, "") ?? "";
+const base = rawBase && !rawBase.endsWith("/api/v1") ? `${rawBase}/api/v1` : rawBase;
 const SESSION_KEY = "civic-session";
 
 function readStoredSession(): Tokens | null {
