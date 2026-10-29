@@ -69,6 +69,19 @@ class DuplicateRepository:
         await self.session.flush()
         return support
 
+    async def remove_support(self, complaint_id: uuid.UUID, citizen_id: uuid.UUID) -> bool:
+        stmt = select(ComplaintSupport).where(
+            ComplaintSupport.complaint_id == complaint_id,
+            ComplaintSupport.citizen_id == citizen_id,
+        )
+        res = await self.session.execute(stmt)
+        support = res.scalar_one_or_none()
+        if support is None:
+            return False
+        await self.session.delete(support)
+        await self.session.flush()
+        return True
+
     async def get_support_count(self, complaint_id: uuid.UUID) -> int:
         stmt = select(func.count(ComplaintSupport.id)).where(
             ComplaintSupport.complaint_id == complaint_id

@@ -55,6 +55,7 @@ class Complaint(Base, UUIDMixin, TimestampMixin):
     ward_name: Mapped[Optional[str]] = mapped_column(String(128), index=True, nullable=True)
     channel: Mapped[str] = mapped_column(String(32), default="WEB", nullable=False)
     status: Mapped[str] = mapped_column(String(32), default="SUBMITTED", index=True, nullable=False)
+    upvote_count: Mapped[int] = mapped_column(Integer, default=0, index=True, nullable=False)
 
     attachments: Mapped[list["Attachment"]] = relationship(
         "Attachment", back_populates="complaint", cascade="all", lazy="selectin"

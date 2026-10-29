@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class DuplicateCandidateResponse(BaseModel):
@@ -56,4 +56,24 @@ class NearbySimilarReport(BaseModel):
 class SupportComplaintResponse(BaseModel):
     complaint_id: uuid.UUID
     support_count: int
+    message: str
+
+
+class UpvoteComplaintRequest(BaseModel):
+    latitude: float | None = Field(default=None, ge=-90.0, le=90.0)
+    longitude: float | None = Field(default=None, ge=-180.0, le=180.0)
+    ward_id: uuid.UUID | None = None
+    ward_number: int | None = Field(default=None, ge=1)
+
+    @model_validator(mode="after")
+    def validate_coordinate_pair(self) -> "UpvoteComplaintRequest":
+        if (self.latitude is None) != (self.longitude is None):
+            raise ValueError("latitude and longitude must be supplied together")
+        return self
+
+
+class UpvoteComplaintResponse(BaseModel):
+    complaint_id: uuid.UUID
+    upvote_count: int
+    upvoted: bool
     message: str

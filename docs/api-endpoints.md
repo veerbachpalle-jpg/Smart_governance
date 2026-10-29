@@ -29,8 +29,10 @@ All listing endpoints use cursor pagination (`?limit=20&cursor=...`).
 | Method | Path | Allowed Roles | Purpose |
 | :--- | :--- | :--- | :--- |
 | `POST` | `/api/v1/complaints` | `citizen` | Submit a new municipal complaint with geo-coordinates and details. |
-| `GET` | `/api/v1/complaints` | `citizen` (own), `officer`, `department_lead`, `supervisor`, `auditor` | Cursor-paginated list of complaints filtered by status, ward, or date. |
+| `GET` | `/api/v1/complaints` | `citizen` (own), `officer`, `department_lead`, `supervisor`, `auditor` | Paginated dynamic-priority list. Supports `status=open`, ward/department filters, and `sort=priority_score\|upvotes\|recent`. |
+| `GET` | `/api/v1/complaints/trending-nearby` | `citizen` | Open complaints within `radius_meters` (default 2 km), ordered by endorsement count. |
 | `GET` | `/api/v1/complaints/{id}` | `citizen` (own), `officer`, `department_lead`, `supervisor`, `auditor` | Retrieve comprehensive complaint details and current status. |
+| `POST` | `/api/v1/complaints/{id}/upvote` | `citizen` in the same ward or within 2 km | Toggle a crowd endorsement and atomically append the corresponding audit event. |
 | `POST` | `/api/v1/complaints/{id}/attachments` | `citizen` (own), `officer` | Upload photos or documents associated with the complaint. |
 | `GET` | `/api/v1/complaints/{id}/attachments` | `citizen` (own), `officer`, `department_lead`, `supervisor`, `auditor` | List all media files and hashes attached to a complaint. |
 | `POST` | `/api/v1/complaints/{id}/reject` | `officer`, `supervisor` | Reject an invalid or out-of-scope complaint with a mandatory reason. |
@@ -82,7 +84,7 @@ All listing endpoints use cursor pagination (`?limit=20&cursor=...`).
 
 | Method | Path | Allowed Roles | Purpose |
 | :--- | :--- | :--- | :--- |
-| `GET` | `/api/v1/cases` | `officer`, `department_lead`, `supervisor`, `auditor` | Cursor-paginated list of cases with multi-department, status, and SLA filters. |
+| `GET` | `/api/v1/cases` | `officer`, `department_lead`, `supervisor`, `auditor` | Dynamic-priority list of cases with status, department, ward, and ordering filters. |
 | `GET` | `/api/v1/cases/{id}` | `citizen` (if owner), `officer`, `department_lead`, `supervisor`, `auditor` | Retrieve full case dossier including lead department, officer, and deadlines. |
 | `POST` | `/api/v1/cases/{id}/accept-lead` | `department_lead` | Department lead formally accepts ownership of routed case. |
 | `POST` | `/api/v1/cases/{id}/assign` | `department_lead`, `supervisor` | Assign a designated field officer to work on the case. |

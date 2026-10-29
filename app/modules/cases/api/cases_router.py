@@ -1,13 +1,16 @@
 import uuid
+from typing import Literal
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import require_roles
+from app.core.pagination import PaginatedResponse
 from app.db.session import get_db
 from app.modules.cases.schemas.case import (
     AddDepartmentRequest,
     AssignOfficerRequest,
+    CaseFilterParams,
     CaseResponse,
     CreateCaseRequest,
     LinkComplaintRequest,
@@ -38,6 +41,40 @@ SUPERVISOR_ROLES = (
     UserRole.SUPERVISOR,
     UserRole.ADMIN,
 )
+
+
+@cases_router.get(
+    "",
+    response_model=PaginatedResponse[CaseResponse],
+    status_code=status.HTTP_200_OK,
+    summary="List cases ordered by dynamic severity, endorsement, and SLA priority",
+)
+async def list_cases(
+    case_status: str | None = Query(None, alias="status"),
+    ward_id: uuid.UUID | None = Query(None),
+    ward_number: int | None = Query(None, ge=1),
+    department_id: uuid.UUID | None = Query(None),
+    department_name: str | None = Query(None),
+    sort: Literal["priority_score", "upvotes", "recent"] = Query("priority_score"),
+    limit: int = Query(20, ge=1, le=100),
+    cursor: str | None = Query(None),
+    current_user: User = Depends(require_roles(*STAFF_ROLES)),
+    session: AsyncSession = Depends(get_db),
+) -> PaginatedResponse[CaseResponse]:
+    del current_user
+    service = CaseService(session)
+    return await service.list_cases(
+        CaseFilterParams(
+            status=case_status,
+            ward_id=ward_id,
+            ward_number=ward_number,
+            department_id=department_id,
+            department_name=department_name,
+            sort=sort,
+            limit=limit,
+            cursor=cursor,
+        )
+    )
 
 
 @cases_router.post(

@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime
+from typing import Literal
 
 from fastapi import APIRouter, Depends, File, Query, Request, UploadFile, status
 from fastapi.responses import JSONResponse
@@ -15,6 +16,7 @@ from app.modules.complaints.schemas.complaint import (
     ComplaintResponse,
     CreateComplaintRequest,
     PublicTrackingResponse,
+    TrendingComplaintResponse,
 )
 from app.modules.complaints.service.complaint_service import ComplaintService
 from app.modules.identity.models.user import User
@@ -82,7 +84,12 @@ async def submit_complaint(
 )
 async def list_complaints(
     complaint_status: str | None = Query(None, alias="status"),
+    ward_id: uuid.UUID | None = Query(None),
+    ward_number: int | None = Query(None, ge=1),
     ward_name: str | None = Query(None),
+    department_id: uuid.UUID | None = Query(None),
+    department_name: str | None = Query(None),
+    sort: Literal["priority_score", "upvotes", "recent"] = Query("priority_score"),
     start_time: datetime | None = Query(None),
     end_time: datetime | None = Query(None),
     limit: int = Query(20, ge=1, le=100),
@@ -92,7 +99,12 @@ async def list_complaints(
 ) -> PaginatedResponse[ComplaintResponse]:
     params = ComplaintFilterParams(
         status=complaint_status,
+        ward_id=ward_id,
+        ward_number=ward_number,
         ward_name=ward_name,
+        department_id=department_id,
+        department_name=department_name,
+        sort=sort,
         start_time=start_time,
         end_time=end_time,
         limit=limit,
@@ -100,6 +112,28 @@ async def list_complaints(
     )
     service = ComplaintService(session)
     return await service.list_complaints(current_user, params)
+
+
+@complaints_router.get(
+    "/trending-nearby",
+    response_model=list[TrendingComplaintResponse],
+    status_code=status.HTTP_200_OK,
+    summary="List open complaints within a regional radius ordered by citizen endorsements",
+)
+async def list_trending_nearby(
+    lat: float = Query(..., ge=-90.0, le=90.0),
+    lng: float = Query(..., ge=-180.0, le=180.0),
+    radius_meters: float = Query(2000.0, ge=50.0, le=20000.0),
+    current_user: User = Depends(require_roles(UserRole.CITIZEN)),
+    session: AsyncSession = Depends(get_db),
+) -> list[TrendingComplaintResponse]:
+    service = ComplaintService(session)
+    return await service.list_trending_nearby(
+        current_user=current_user,
+        latitude=lat,
+        longitude=lng,
+        radius_meters=radius_meters,
+    )
 
 
 @complaints_router.get(

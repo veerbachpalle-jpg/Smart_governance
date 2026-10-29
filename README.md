@@ -282,17 +282,19 @@ The API is versioned under `/api/v1`. Interactive documentation and request sche
 | Area | Example endpoints | Purpose |
 |---|---|---|
 | Authentication | `POST /api/v1/auth/register`, `POST /api/v1/auth/login` | Citizen registration and token issuance |
-| Complaints | `POST /api/v1/complaints`, `GET /api/v1/complaints/{complaint_id}` | Submit and retrieve complaints |
+| Complaints | `POST /api/v1/complaints`, `GET /api/v1/complaints`, `GET /api/v1/complaints/trending-nearby` | Submit, filter, rank, and discover nearby complaints |
 | AI interpretation | `GET /api/v1/complaints/{complaint_id}/ai-interpretation` | View a structured triage recommendation |
 | Routing | `GET /api/v1/complaints/{complaint_id}/routing` | Inspect department suggestions |
 | Priority | `GET /api/v1/complaints/{complaint_id}/priority`, `GET /api/v1/priority/queue` | Review priority assessments and safety queue |
-| Similar incidents | `GET /api/v1/complaints/{complaint_id}/duplicates` | Retrieve duplicate candidates for staff review |
-| Cases | `POST /api/v1/cases`, `POST /api/v1/cases/{case_id}/transition` | Group complaints and manage case state |
+| Similar incidents | `GET /api/v1/complaints/{complaint_id}/duplicates`, `POST /api/v1/complaints/{complaint_id}/upvote` | Review duplicates and toggle a regional citizen endorsement |
+| Cases | `GET /api/v1/cases`, `POST /api/v1/cases`, `POST /api/v1/cases/{case_id}/transition` | Rank, group, and manage cases |
 | Challenges | `POST /api/v1/cases/{case_id}/challenge`, `POST /api/v1/challenges/{challenge_id}/review` | Submit and review challenges |
 | Audit | `GET /api/v1/audit/events`, `GET /api/v1/audit/verify` | Query audit history and verify the hash chain |
 | Manual triage | `GET /api/v1/triage/manual/queue` | Find complaints awaiting human triage |
 
 Creating complaint requests require an `Idempotency-Key` header. Authentication and role permissions apply to protected endpoints; consult the live API documentation for exact schemas and requirements.
+
+Complaint and case queues default to a dynamic priority score: `severity weight + (upvotes × 25) + SLA urgency`. Severity weights are Critical `40000`, High `20000`, Medium `10000`, and Low `0`; SLA urgency is bounded below the next severity tier so a Critical issue always outranks a Medium issue with 500 endorsements. Complaint lists support ward and department filters plus `priority_score`, `upvotes`, and `recent` ordering. Citizens may toggle an endorsement only when they can establish that they are in the same ward or within two kilometres of the open complaint; both actions are recorded in the audit trail.
 
 ## Testing and Code Quality
 

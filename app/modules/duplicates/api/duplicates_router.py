@@ -11,6 +11,8 @@ from app.modules.duplicates.schemas.duplicate import (
     LinkDuplicateRequest,
     NearbySimilarReport,
     SupportComplaintResponse,
+    UpvoteComplaintRequest,
+    UpvoteComplaintResponse,
 )
 from app.modules.duplicates.service.duplicate_service import DuplicateService
 from app.modules.identity.models.user import User
@@ -129,3 +131,21 @@ async def support_complaint(
     res = await service.support_complaint(complaint_id, current_user)
     await session.commit()
     return res
+
+
+@duplicates_router.post(
+    "/complaints/{complaint_id}/upvote",
+    response_model=UpvoteComplaintResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Toggle a citizen endorsement for an open complaint in the same ward or within 2 km",
+)
+async def toggle_complaint_upvote(
+    complaint_id: uuid.UUID,
+    payload: UpvoteComplaintRequest,
+    current_user: User = Depends(require_roles(UserRole.CITIZEN)),
+    session: AsyncSession = Depends(get_db),
+) -> UpvoteComplaintResponse:
+    service = DuplicateService(session)
+    result = await service.toggle_upvote(complaint_id, current_user, payload)
+    await session.commit()
+    return result

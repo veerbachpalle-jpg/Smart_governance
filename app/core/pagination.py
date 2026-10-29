@@ -24,6 +24,21 @@ def decode_cursor(cursor_str: str) -> tuple[datetime, uuid.UUID]:
         raise ValueError("Invalid cursor format") from err
 
 
+def encode_offset_cursor(offset: int) -> str:
+    return base64.urlsafe_b64encode(f"offset:{offset}".encode("utf-8")).decode("utf-8")
+
+
+def decode_offset_cursor(cursor_str: str) -> int:
+    try:
+        raw = base64.urlsafe_b64decode(cursor_str.encode("utf-8")).decode("utf-8")
+        prefix, value = raw.split(":", 1)
+        if prefix != "offset":
+            raise ValueError
+        return max(0, int(value))
+    except Exception as err:
+        raise ValueError("Invalid cursor format") from err
+
+
 class PaginatedResponse(BaseModel, Generic[T]):
     """Standardized keyset/cursor paginated response structure."""
 

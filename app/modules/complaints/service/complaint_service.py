@@ -15,6 +15,7 @@ from app.core.outbox import enqueue_outbox_event
 from app.core.pagination import PaginatedResponse
 from app.modules.audit.service.audit_service import AuditService
 from app.modules.complaints.models.complaint import Attachment, Complaint
+from app.modules.complaints.ranking import calculate_sla_deadline, haversine_distance_meters
 from app.modules.complaints.repository.complaint_repository import (
     AttachmentRepository,
     ComplaintRepository,
@@ -25,7 +26,9 @@ from app.modules.complaints.schemas.complaint import (
     ComplaintResponse,
     CreateComplaintRequest,
     PublicTrackingResponse,
+    TrendingComplaintResponse,
 )
+from app.modules.duplicates.repository.duplicate_repository import DuplicateRepository
 from app.modules.identity.models.user import User
 
 ALLOWED_MIME_TYPES = {
@@ -73,6 +76,7 @@ class ComplaintService:
         self.attachment_repo = AttachmentRepository(session)
         self.ward_lookup = WardLookupService(session)
         self.audit_service = AuditService(session)
+        self.duplicate_repo = DuplicateRepository(session)
 
     async def create_complaint(
         self,
@@ -160,12 +164,79 @@ class ComplaintService:
         items, next_cursor, has_more, total_count = await self.complaint_repo.list_complaints(
             scoped_citizen_id, params
         )
+        now = datetime.now(timezone.utc)
+        responses: list[ComplaintResponse] = []
+        for record in items:
+            deadline = calculate_sla_deadline(
+                record.priority_band,
+                record.complaint.created_at,
+                record.suggested_sla_hours,
+            )
+            responses.append(
+                ComplaintResponse.model_validate(record.complaint).model_copy(
+                    update={
+                        "priority_band": record.priority_band,
+                        "sla_urgency_points": record.sla_urgency_points,
+                        "composite_score": record.composite_score,
+                        "sla_deadline": deadline,
+                        "sla_seconds_remaining": int((deadline - now).total_seconds()),
+                        "is_sla_overdue": deadline <= now,
+                        "department_id": record.department_id,
+                        "department_name": record.department_name,
+                        "ward_number": record.ward_number,
+                    }
+                )
+            )
         return PaginatedResponse[ComplaintResponse](
-            items=[ComplaintResponse.model_validate(c) for c in items],
+            items=responses,
             next_cursor=next_cursor,
             has_more=has_more,
             total_count=total_count,
         )
+
+    async def list_trending_nearby(
+        self,
+        current_user: User,
+        latitude: float,
+        longitude: float,
+        radius_meters: float,
+    ) -> list[TrendingComplaintResponse]:
+        candidates = await self.complaint_repo.list_open_nearby_candidates(
+            latitude, longitude, radius_meters
+        )
+        trending: list[TrendingComplaintResponse] = []
+        for record in candidates:
+            complaint = record.complaint
+            distance = haversine_distance_meters(
+                latitude, longitude, complaint.latitude, complaint.longitude
+            )
+            if distance > radius_meters:
+                continue
+            trending.append(
+                TrendingComplaintResponse(
+                    id=complaint.id,
+                    tracking_number=complaint.tracking_number,
+                    title=complaint.original_title,
+                    latitude=complaint.latitude,
+                    longitude=complaint.longitude,
+                    ward_id=complaint.ward_id,
+                    ward_name=complaint.ward_name,
+                    ward_number=record.ward_number,
+                    status=complaint.status,
+                    created_at=complaint.created_at,
+                    distance_meters=round(distance, 1),
+                    upvote_count=complaint.upvote_count,
+                    priority_band=record.priority_band,
+                    composite_score=record.composite_score,
+                    upvoted_by_current_user=await self.duplicate_repo.has_citizen_supported(
+                        complaint.id, current_user.id
+                    ),
+                )
+            )
+        trending.sort(
+            key=lambda item: (-item.upvote_count, -item.composite_score, item.created_at)
+        )
+        return trending[:20]
 
     async def get_complaint(self, current_user: User, complaint_id: uuid.UUID) -> Complaint:
         """Retrieves complaint detail enforcing object-level ownership for citizens."""

@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import ConflictError, NotFoundError
 from app.core.outbox import enqueue_outbox_event
+from app.core.pagination import PaginatedResponse
 from app.modules.activity.models.activity import CaseActivity
 from app.modules.audit.service.audit_service import AuditService
 from app.modules.cases.models.case import Case, CaseComplaint, CaseDepartment
@@ -14,6 +15,7 @@ from app.modules.cases.schemas.case import (
     AddDepartmentRequest,
     AssignOfficerRequest,
     CaseDepartmentResponse,
+    CaseFilterParams,
     CaseResponse,
     CreateCaseRequest,
     LinkComplaintRequest,
@@ -22,6 +24,7 @@ from app.modules.cases.schemas.case import (
     TransitionCaseRequest,
 )
 from app.modules.cases.service.state_machine import CaseStateMachine
+from app.modules.complaints.ranking import calculate_sla_deadline
 from app.modules.complaints.repository.complaint_repository import ComplaintRepository
 from app.modules.identity.models.user import Department, User
 
@@ -62,6 +65,40 @@ class CaseService:
             updated_at=case.updated_at,
             departments=depts_resp,
             complaint_ids=complaint_ids,
+            ward_names=sorted(
+                {
+                    link.complaint.ward_name
+                    for link in case.case_complaints
+                    if link.complaint and link.complaint.ward_name
+                }
+            ),
+        )
+
+    async def list_cases(
+        self, params: CaseFilterParams
+    ) -> PaginatedResponse[CaseResponse]:
+        records, next_cursor, has_more, total_count = await self.repo.list_cases(params)
+        now = datetime.now(timezone.utc)
+        responses: list[CaseResponse] = []
+        for record in records:
+            deadline = calculate_sla_deadline(record.case.priority, record.case.created_at)
+            responses.append(
+                self._build_response(record.case).model_copy(
+                    update={
+                        "upvote_count": record.upvote_count,
+                        "sla_urgency_points": record.sla_urgency_points,
+                        "composite_score": record.composite_score,
+                        "sla_deadline": deadline,
+                        "sla_seconds_remaining": int((deadline - now).total_seconds()),
+                        "is_sla_overdue": deadline <= now,
+                    }
+                )
+            )
+        return PaginatedResponse[CaseResponse](
+            items=responses,
+            next_cursor=next_cursor,
+            has_more=has_more,
+            total_count=total_count,
         )
 
     async def create_case_from_complaint(

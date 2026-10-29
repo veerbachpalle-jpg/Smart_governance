@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -44,6 +45,16 @@ class ComplaintResponse(BaseModel):
     ward_name: str | None = None
     channel: str
     status: str
+    upvote_count: int = 0
+    priority_band: str = "MEDIUM"
+    sla_urgency_points: int = 0
+    composite_score: int = 0
+    sla_deadline: datetime | None = None
+    sla_seconds_remaining: int | None = None
+    is_sla_overdue: bool = False
+    department_id: uuid.UUID | None = None
+    department_name: str | None = None
+    ward_number: int | None = None
     created_at: datetime
     updated_at: datetime
     attachments: list[AttachmentResponse] = Field(default_factory=list)
@@ -65,8 +76,31 @@ class PublicTrackingResponse(BaseModel):
 
 class ComplaintFilterParams(BaseModel):
     status: str | None = None
+    ward_id: uuid.UUID | None = None
+    ward_number: int | None = None
     ward_name: str | None = None
+    department_id: uuid.UUID | None = None
+    department_name: str | None = None
+    sort: Literal["priority_score", "upvotes", "recent"] = "priority_score"
     start_time: datetime | None = None
     end_time: datetime | None = None
     limit: int = Field(default=20, ge=1, le=100)
     cursor: str | None = None
+
+
+class TrendingComplaintResponse(BaseModel):
+    id: uuid.UUID
+    tracking_number: str
+    title: str
+    latitude: float
+    longitude: float
+    ward_id: uuid.UUID | None = None
+    ward_name: str | None = None
+    ward_number: int | None = None
+    status: str
+    created_at: datetime
+    distance_meters: float
+    upvote_count: int
+    priority_band: str
+    composite_score: int
+    upvoted_by_current_user: bool = False

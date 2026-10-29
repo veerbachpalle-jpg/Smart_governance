@@ -758,6 +758,64 @@
         }
       }
     },
+    "/api/v1/complaints/{complaint_id}/upvote": {
+      "post": {
+        "tags": [
+          "Duplicates"
+        ],
+        "summary": "Toggle a citizen endorsement for an open complaint in the same ward or within 2 km",
+        "operationId": "toggle_complaint_upvote_api_v1_complaints__complaint_id__upvote_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "complaint_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Complaint Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpvoteComplaintRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpvoteComplaintResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/complaints": {
       "post": {
         "tags": [
@@ -850,6 +908,40 @@
             }
           },
           {
+            "name": "ward_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Ward Id"
+            }
+          },
+          {
+            "name": "ward_number",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Ward Number"
+            }
+          },
+          {
             "name": "ward_name",
             "in": "query",
             "required": false,
@@ -863,6 +955,54 @@
                 }
               ],
               "title": "Ward Name"
+            }
+          },
+          {
+            "name": "department_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Department Id"
+            }
+          },
+          {
+            "name": "department_name",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Department Name"
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "priority_score",
+                "upvotes",
+                "recent"
+              ],
+              "type": "string",
+              "default": "priority_score",
+              "title": "Sort"
             }
           },
           {
@@ -935,6 +1075,82 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/PaginatedResponse_ComplaintResponse_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/complaints/trending-nearby": {
+      "get": {
+        "tags": [
+          "Complaints"
+        ],
+        "summary": "List open complaints within a regional radius ordered by citizen endorsements",
+        "operationId": "list_trending_nearby_api_v1_complaints_trending_nearby_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "lat",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "number",
+              "maximum": 90.0,
+              "minimum": -90.0,
+              "title": "Lat"
+            }
+          },
+          {
+            "name": "lng",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "number",
+              "maximum": 180.0,
+              "minimum": -180.0,
+              "title": "Lng"
+            }
+          },
+          {
+            "name": "radius_meters",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "maximum": 20000.0,
+              "minimum": 50.0,
+              "default": 2000.0,
+              "title": "Radius Meters"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TrendingComplaintResponse"
+                  },
+                  "title": "Response List Trending Nearby Api V1 Complaints Trending Nearby Get"
                 }
               }
             }
@@ -2307,21 +2523,188 @@
       }
     },
     "/api/v1/cases": {
+      "get": {
+        "tags": [
+          "Cases"
+        ],
+        "summary": "List cases ordered by dynamic severity, endorsement, and SLA priority",
+        "operationId": "list_cases_api_v1_cases_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "name": "ward_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Ward Id"
+            }
+          },
+          {
+            "name": "ward_number",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Ward Number"
+            }
+          },
+          {
+            "name": "department_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Department Id"
+            }
+          },
+          {
+            "name": "department_name",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Department Name"
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "priority_score",
+                "upvotes",
+                "recent"
+              ],
+              "type": "string",
+              "default": "priority_score",
+              "title": "Sort"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedResponse_CaseResponse_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
       "post": {
         "tags": [
           "Cases"
         ],
         "summary": "Create a new case grouping one or more complaints",
         "operationId": "create_case_api_v1_cases_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/CreateCaseRequest"
               }
             }
-          },
-          "required": true
+          }
         },
         "responses": {
           "201": {
@@ -2344,12 +2727,7 @@
               }
             }
           }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ]
+        }
       }
     },
     "/api/v1/cases/{case_id}": {
@@ -4222,6 +4600,57 @@
             "type": "array",
             "title": "Complaint Ids",
             "default": []
+          },
+          "upvote_count": {
+            "type": "integer",
+            "title": "Upvote Count",
+            "default": 0
+          },
+          "sla_urgency_points": {
+            "type": "integer",
+            "title": "Sla Urgency Points",
+            "default": 0
+          },
+          "composite_score": {
+            "type": "integer",
+            "title": "Composite Score",
+            "default": 0
+          },
+          "sla_deadline": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sla Deadline"
+          },
+          "sla_seconds_remaining": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sla Seconds Remaining"
+          },
+          "is_sla_overdue": {
+            "type": "boolean",
+            "title": "Is Sla Overdue",
+            "default": false
+          },
+          "ward_names": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Ward Names",
+            "default": []
           }
         },
         "type": "object",
@@ -4776,6 +5205,88 @@
           "status": {
             "type": "string",
             "title": "Status"
+          },
+          "upvote_count": {
+            "type": "integer",
+            "title": "Upvote Count",
+            "default": 0
+          },
+          "priority_band": {
+            "type": "string",
+            "title": "Priority Band",
+            "default": "MEDIUM"
+          },
+          "sla_urgency_points": {
+            "type": "integer",
+            "title": "Sla Urgency Points",
+            "default": 0
+          },
+          "composite_score": {
+            "type": "integer",
+            "title": "Composite Score",
+            "default": 0
+          },
+          "sla_deadline": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sla Deadline"
+          },
+          "sla_seconds_remaining": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sla Seconds Remaining"
+          },
+          "is_sla_overdue": {
+            "type": "boolean",
+            "title": "Is Sla Overdue",
+            "default": false
+          },
+          "department_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department Id"
+          },
+          "department_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department Name"
+          },
+          "ward_number": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ward Number"
           },
           "created_at": {
             "type": "string",
@@ -5929,6 +6440,46 @@
         "type": "object",
         "title": "PaginatedResponse[AuditEventResponse]"
       },
+      "PaginatedResponse_CaseResponse_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/CaseResponse"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          },
+          "has_more": {
+            "type": "boolean",
+            "title": "Has More",
+            "default": false
+          },
+          "total_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Count"
+          }
+        },
+        "type": "object",
+        "title": "PaginatedResponse[CaseResponse]"
+      },
       "PaginatedResponse_ComplaintResponse_": {
         "properties": {
           "items": {
@@ -7067,6 +7618,195 @@
           "target_state"
         ],
         "title": "TransitionCaseRequest"
+      },
+      "TrendingComplaintResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "tracking_number": {
+            "type": "string",
+            "title": "Tracking Number"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "latitude": {
+            "type": "number",
+            "title": "Latitude"
+          },
+          "longitude": {
+            "type": "number",
+            "title": "Longitude"
+          },
+          "ward_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ward Id"
+          },
+          "ward_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ward Name"
+          },
+          "ward_number": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ward Number"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "distance_meters": {
+            "type": "number",
+            "title": "Distance Meters"
+          },
+          "upvote_count": {
+            "type": "integer",
+            "title": "Upvote Count"
+          },
+          "priority_band": {
+            "type": "string",
+            "title": "Priority Band"
+          },
+          "composite_score": {
+            "type": "integer",
+            "title": "Composite Score"
+          },
+          "upvoted_by_current_user": {
+            "type": "boolean",
+            "title": "Upvoted By Current User",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "tracking_number",
+          "title",
+          "latitude",
+          "longitude",
+          "status",
+          "created_at",
+          "distance_meters",
+          "upvote_count",
+          "priority_band",
+          "composite_score"
+        ],
+        "title": "TrendingComplaintResponse"
+      },
+      "UpvoteComplaintRequest": {
+        "properties": {
+          "latitude": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 90.0,
+                "minimum": -90.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latitude"
+          },
+          "longitude": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 180.0,
+                "minimum": -180.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Longitude"
+          },
+          "ward_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ward Id"
+          },
+          "ward_number": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ward Number"
+          }
+        },
+        "type": "object",
+        "title": "UpvoteComplaintRequest"
+      },
+      "UpvoteComplaintResponse": {
+        "properties": {
+          "complaint_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Complaint Id"
+          },
+          "upvote_count": {
+            "type": "integer",
+            "title": "Upvote Count"
+          },
+          "upvoted": {
+            "type": "boolean",
+            "title": "Upvoted"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "complaint_id",
+          "upvote_count",
+          "upvoted",
+          "message"
+        ],
+        "title": "UpvoteComplaintResponse"
       },
       "UserResponse": {
         "properties": {

@@ -8,7 +8,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.errors import BadRequestError, NotFoundError
 from app.modules.ai_assist.service.providers import get_embedding_provider
 from app.modules.audit.service.audit_service import AuditService
-from app.modules.complaints.models.complaint import Complaint
+from app.modules.complaints.models.complaint import Complaint, Ward
+from app.modules.complaints.ranking import haversine_distance_meters
 from app.modules.complaints.repository.complaint_repository import ComplaintRepository
 from app.modules.duplicates.models.duplicate import (
     ComplaintEmbedding,
@@ -22,26 +23,12 @@ from app.modules.duplicates.schemas.duplicate import (
     LinkDuplicateRequest,
     NearbySimilarReport,
     SupportComplaintResponse,
+    UpvoteComplaintRequest,
+    UpvoteComplaintResponse,
 )
 from app.modules.identity.models.user import User
 
 logger = logging.getLogger("app.duplicates.service")
-
-
-def haversine_distance_meters(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
-    """Computes great-circle distance between two GPS coordinates in meters."""
-    R = 6371000.0  # Earth radius in meters
-    phi1 = math.radians(lat1)
-    phi2 = math.radians(lat2)
-    delta_phi = math.radians(lat2 - lat1)
-    delta_lambda = math.radians(lon2 - lon1)
-
-    a = (
-        math.sin(delta_phi / 2.0) ** 2
-        + math.cos(phi1) * math.cos(phi2) * math.sin(delta_lambda / 2.0) ** 2
-    )
-    c = 2.0 * math.atan2(math.sqrt(a), math.sqrt(1.0 - a))
-    return R * c
 
 
 def cosine_similarity(vec_a: list[float], vec_b: list[float]) -> float:
@@ -409,6 +396,7 @@ class DuplicateService:
         has_supported = await self.repo.has_citizen_supported(complaint_id, citizen.id)
         if has_supported:
             count = await self.repo.get_support_count(complaint_id)
+            complaint.upvote_count = count
             return SupportComplaintResponse(
                 complaint_id=complaint.id,
                 support_count=count,
@@ -421,6 +409,7 @@ class DuplicateService:
         )
         await self.repo.add_support(support)
         count = await self.repo.get_support_count(complaint_id)
+        complaint.upvote_count = count
 
         await self.audit_service.record_event(
             entity_type="complaint",
@@ -435,4 +424,93 @@ class DuplicateService:
             complaint_id=complaint.id,
             support_count=count,
             message="Support successfully added to grievance report.",
+        )
+
+    async def toggle_upvote(
+        self,
+        complaint_id: uuid.UUID,
+        citizen: User,
+        payload: UpvoteComplaintRequest,
+    ) -> UpvoteComplaintResponse:
+        """Atomically toggle a regional endorsement and append its audit event."""
+        complaint = await self.complaint_repo.get_by_id_for_update(complaint_id)
+        if not complaint:
+            raise NotFoundError(
+                f"Complaint '{complaint_id}' not found.", code="COMPLAINT_NOT_FOUND"
+            )
+        if complaint.status in {"CLOSED", "RESOLVED", "REJECTED_WITH_REASON"}:
+            raise BadRequestError(
+                "Only open complaints can receive regional endorsements.",
+                code="COMPLAINT_NOT_OPEN",
+            )
+
+        region_matches = False
+        if payload.ward_id and complaint.ward_id == payload.ward_id:
+            region_matches = True
+        if payload.ward_number is not None and complaint.ward_id:
+            ward = await self.session.get(Ward, complaint.ward_id)
+            region_matches = bool(ward and ward.ward_number == payload.ward_number)
+        if payload.latitude is not None and payload.longitude is not None:
+            region_matches = region_matches or haversine_distance_meters(
+                payload.latitude,
+                payload.longitude,
+                complaint.latitude,
+                complaint.longitude,
+            ) <= 2_000.0
+
+        if not region_matches:
+            latest = await self.complaint_repo.get_latest_by_citizen(citizen.id)
+            if latest:
+                same_ward = bool(
+                    latest.ward_id and complaint.ward_id and latest.ward_id == complaint.ward_id
+                )
+                nearby = (
+                    haversine_distance_meters(
+                        latest.latitude,
+                        latest.longitude,
+                        complaint.latitude,
+                        complaint.longitude,
+                    )
+                    <= 2_000.0
+                )
+                region_matches = same_ward or nearby
+
+        if not region_matches:
+            raise BadRequestError(
+                "You can only endorse issues in your ward or within 2 km of your location.",
+                code="OUTSIDE_ENDORSEMENT_REGION",
+            )
+
+        old_count = complaint.upvote_count
+        if await self.repo.has_citizen_supported(complaint.id, citizen.id):
+            await self.repo.remove_support(complaint.id, citizen.id)
+            upvoted = False
+            action = "complaint.upvote_removed"
+        else:
+            await self.repo.add_support(
+                ComplaintSupport(complaint_id=complaint.id, citizen_id=citizen.id)
+            )
+            upvoted = True
+            action = "complaint.upvoted"
+
+        count = await self.repo.get_support_count(complaint.id)
+        complaint.upvote_count = count
+        await self.audit_service.record_event(
+            entity_type="complaint",
+            entity_id=complaint.id,
+            action=action,
+            actor_id=citizen.id,
+            actor_role=citizen.role,
+            old_state={"upvote_count": old_count},
+            new_state={"upvote_count": count, "upvoted": upvoted},
+        )
+        return UpvoteComplaintResponse(
+            complaint_id=complaint.id,
+            upvote_count=count,
+            upvoted=upvoted,
+            message=(
+                "You endorsed this issue and will receive resolution updates."
+                if upvoted
+                else "Your endorsement was removed."
+            ),
         )

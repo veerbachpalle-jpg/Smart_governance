@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from typing import Optional
+from typing import Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -64,5 +64,23 @@ class CaseResponse(BaseModel):
     updated_at: datetime
     departments: list[CaseDepartmentResponse] = []
     complaint_ids: list[uuid.UUID] = []
+    upvote_count: int = 0
+    sla_urgency_points: int = 0
+    composite_score: int = 0
+    sla_deadline: datetime | None = None
+    sla_seconds_remaining: int | None = None
+    is_sla_overdue: bool = False
+    ward_names: list[str] = []
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class CaseFilterParams(BaseModel):
+    status: str | None = None
+    ward_id: uuid.UUID | None = None
+    ward_number: int | None = None
+    department_id: uuid.UUID | None = None
+    department_name: str | None = None
+    sort: Literal["priority_score", "upvotes", "recent"] = "priority_score"
+    limit: int = Field(default=20, ge=1, le=100)
+    cursor: str | None = None

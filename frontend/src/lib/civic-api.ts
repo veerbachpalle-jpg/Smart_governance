@@ -1,5 +1,5 @@
 import { sampleComplaints } from "./civic-data";
-import type { Complaint, NewComplaint, Role, Status, Tokens } from "./civic-types";
+import type { Complaint, NewComplaint, Role, Status, Tokens, TrendingIssue } from "./civic-types";
 export function getIsDemo(): boolean {
   if (typeof window === "undefined") return true;
   const saved = localStorage.getItem("civic-mode");
@@ -175,6 +175,37 @@ interface BackendComplaint {
   status: string;
   created_at: string;
   attachments: BackendAttachment[];
+  upvote_count: number;
+  priority_band: string;
+  composite_score: number;
+  sla_deadline: string | null;
+  sla_seconds_remaining: number | null;
+  is_sla_overdue: boolean;
+  department_name: string | null;
+  ward_number: number | null;
+}
+
+interface BackendTrendingIssue {
+  id: string;
+  tracking_number: string;
+  title: string;
+  latitude: number;
+  longitude: number;
+  ward_name: string | null;
+  ward_number: number | null;
+  status: string;
+  distance_meters: number;
+  upvote_count: number;
+  priority_band: string;
+  composite_score: number;
+  upvoted_by_current_user: boolean;
+}
+
+interface BackendUpvoteResult {
+  complaint_id: string;
+  upvote_count: number;
+  upvoted: boolean;
+  message: string;
 }
 
 interface BackendPage<T> {
@@ -236,8 +267,26 @@ function toComplaint(row: BackendComplaint): Complaint {
     lng: row.longitude,
     status,
     date,
-    department: status === "submitted" ? "Awaiting human assignment" : "Municipal service team",
-    priority: "Normal",
+    department:
+      row.department_name ??
+      (status === "submitted" ? "Awaiting human assignment" : "Municipal service team"),
+    priority:
+      row.priority_band === "CRITICAL"
+        ? "Critical"
+        : row.priority_band === "HIGH"
+          ? "High"
+          : "Normal",
+    priorityBand: (["LOW", "MEDIUM", "HIGH", "CRITICAL"].includes(row.priority_band)
+      ? row.priority_band
+      : "MEDIUM") as NonNullable<Complaint["priorityBand"]>,
+    upvoteCount: row.upvote_count ?? 0,
+    compositeScore: row.composite_score ?? 0,
+    ...(row.sla_deadline ? { slaDeadline: row.sla_deadline } : {}),
+    ...(row.sla_seconds_remaining !== null
+      ? { slaSecondsRemaining: row.sla_seconds_remaining }
+      : {}),
+    slaOverdue: row.is_sla_overdue ?? false,
+    ...(row.ward_number !== null ? { wardNumber: row.ward_number } : {}),
     evidenceVerified: status === "resolved",
     attachments: row.attachments.map((attachment) => mediaUrl(attachment.file_url)),
     activity: [
@@ -301,6 +350,10 @@ export const civicApi = {
       date,
       department: tracked.ward_name ?? "Municipal service team",
       priority: "Normal",
+      priorityBand: "MEDIUM",
+      upvoteCount: 0,
+      compositeScore: 10_000,
+      slaOverdue: false,
       evidenceVerified: ["CLOSED", "RESOLVED"].includes(tracked.status.toUpperCase()),
       attachments: [],
       activity: [
@@ -377,6 +430,77 @@ export const civicApi = {
     const next = { ...row, ...changes };
     demoRows = demoRows.map((item) => (item.id === id ? next : item));
     return next;
+  },
+  async trending(latitude: number, longitude: number): Promise<TrendingIssue[]> {
+    if (isDemo) {
+      await delay();
+      return demoRows
+        .filter((row) => row.status !== "resolved")
+        .sort((a, b) => (b.upvoteCount ?? 0) - (a.upvoteCount ?? 0))
+        .slice(0, 4)
+        .map((row) => ({
+          id: row.id,
+          backendId: row.backendId ?? row.id,
+          title: row.title,
+          ward: row.ward,
+          ...(row.wardNumber !== undefined ? { wardNumber: row.wardNumber } : {}),
+          lat: row.lat,
+          lng: row.lng,
+          status: row.status,
+          distanceMeters: 0,
+          upvoteCount: row.upvoteCount ?? 0,
+          priorityBand:
+            row.priorityBand ??
+            (row.priority === "Critical"
+              ? "CRITICAL"
+              : row.priority === "High"
+                ? "HIGH"
+                : "MEDIUM"),
+          compositeScore: row.compositeScore ?? 0,
+          upvoted: false,
+        }));
+    }
+    if (!tokens) return [];
+    const rows = await request<BackendTrendingIssue[]>(
+      `/complaints/trending-nearby?lat=${encodeURIComponent(latitude)}&lng=${encodeURIComponent(longitude)}&radius_meters=2000`,
+    );
+    return rows.map((row) => ({
+      id: row.tracking_number,
+      backendId: row.id,
+      title: row.title,
+      ward: row.ward_name ?? "Ward assignment pending",
+      ...(row.ward_number !== null ? { wardNumber: row.ward_number } : {}),
+      lat: row.latitude,
+      lng: row.longitude,
+      status: row.status,
+      distanceMeters: row.distance_meters,
+      upvoteCount: row.upvote_count,
+      priorityBand: row.priority_band as TrendingIssue["priorityBand"],
+      compositeScore: row.composite_score,
+      upvoted: row.upvoted_by_current_user,
+    }));
+  },
+  async toggleUpvote(
+    issue: TrendingIssue,
+    latitude: number,
+    longitude: number,
+  ): Promise<BackendUpvoteResult> {
+    if (isDemo) {
+      await delay();
+      const upvoted = !issue.upvoted;
+      return {
+        complaint_id: issue.backendId,
+        upvote_count: Math.max(0, issue.upvoteCount + (upvoted ? 1 : -1)),
+        upvoted,
+        message: upvoted
+          ? "You endorsed this issue and will receive resolution updates."
+          : "Your endorsement was removed.",
+      };
+    }
+    return request<BackendUpvoteResult>(`/complaints/${issue.backendId}/upvote`, {
+      method: "POST",
+      body: JSON.stringify({ latitude, longitude }),
+    });
   },
   async transition(
     id: string,
