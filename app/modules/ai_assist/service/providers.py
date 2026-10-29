@@ -901,14 +901,14 @@ def get_llm_provider() -> LLMProvider:
     """Return the active LLM provider based on the AI_PROVIDER setting.
 
     Priority order:
-      1. groq   — Llama 3.3-70B on Groq LPU cloud (fast, free tier)
+      1. groq  — Llama 3.3-70B on Groq LPU cloud (fast, free tier)
       2. gemini — Google Gemini (kept as automatic fallback)
-      3. mock   — deterministic keyword-based provider for tests / offline
+      3. mock  — deterministic keyword-based provider for tests / offline
     """
-    provider = getattr(settings, "AI_PROVIDER", "gemini").lower().strip()
+    provider = settings.AI_PROVIDER.lower().strip()
 
     if provider == "groq":
-        if not getattr(settings, "GROQ_API_KEY", None):
+        if not settings.GROQ_API_KEY:
             logger.warning(
                 "AI_PROVIDER=groq but GROQ_API_KEY is not set. "
                 "Falling back to Gemini or mock provider."
@@ -916,7 +916,7 @@ def get_llm_provider() -> LLMProvider:
         else:
             return GroqProvider(
                 api_key=settings.GROQ_API_KEY,
-                model=getattr(settings, "GROQ_MODEL", "llama-3.3-70b-versatile"),
+                model=settings.GROQ_MODEL,
             )
 
     # Fallback: Gemini (also used when provider='gemini')
@@ -932,6 +932,7 @@ def get_llm_provider() -> LLMProvider:
 
 
 def get_embedding_provider() -> EmbeddingProvider:
+    """Embeddings always use GeminiProvider (Groq does not support embeddings)."""
     if settings.GEMINI_API_KEY:
         return GeminiProvider(
             api_key=settings.GEMINI_API_KEY,

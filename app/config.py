@@ -46,9 +46,10 @@ class Settings(BaseSettings):
     AI_ENABLED: bool = Field(default=True)
 
     # Provider selection: 'groq' (default) | 'gemini' | 'mock'
+    # Switch providers by changing this value in your .env — no code changes needed.
     AI_PROVIDER: str = Field(default="groq")
 
-    # --- Groq (Llama 3.3-70B / gpt-oss-120b on Groq LPU cloud) ---
+    # --- Groq (Llama 3.3-70B on LPU cloud) ---
     GROQ_API_KEY: str | None = Field(default=None)
     GROQ_MODEL: str = Field(default="openai/gpt-oss-120b")
 
