@@ -718,6 +718,92 @@ class MockProvider(LLMProvider, EmbeddingProvider):
         return [await self.embed_text(t) for t in texts]
 
 
+class GroqProvider(LLMProvider):
+    """Llama 3.3-70B running on Groq LPU cloud — extremely low latency inference.
+
+    Uses the OpenAI-compatible /chat/completions endpoint with native JSON mode.
+    Embedding is NOT supported by Groq; GeminiProvider or MockProvider handles
+    vector embeddings separately.
+    """
+
+    def __init__(self, api_key: str, model: str = "llama-3.3-70b-versatile") -> None:
+        self.api_key = api_key
+        self.model = model
+        self.base_url = "https://api.groq.com/openai/v1"
+
+    async def generate_text(
+        self,
+        prompt: str,
+        system_instruction: str | None = None,
+        temperature: float = 0.0,
+    ) -> str:
+        messages: list[dict[str, str]] = []
+        if system_instruction:
+            messages.append({"role": "system", "content": system_instruction})
+        messages.append({"role": "user", "content": prompt})
+
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json",
+        }
+        payload = {
+            "model": self.model,
+            "messages": messages,
+            "temperature": temperature,
+        }
+
+        async with httpx.AsyncClient(timeout=settings.AI_TIMEOUT_SECONDS) as client:
+            resp = await client.post(
+                f"{self.base_url}/chat/completions",
+                headers=headers,
+                json=payload,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            return data["choices"][0]["message"]["content"] or ""
+
+    async def generate_structured(
+        self,
+        prompt: str,
+        schema: type[T],
+        system_instruction: str | None = None,
+        temperature: float = 0.0,
+    ) -> T:
+        schema_json = json.dumps(schema.model_json_schema())
+        instruction = (
+            f"{system_instruction}\n\n" if system_instruction else ""
+        ) + f"You MUST return ONLY valid JSON conforming to this JSON Schema:\n{schema_json}"
+
+        messages: list[dict[str, str]] = [
+            {"role": "system", "content": instruction},
+            {"role": "user", "content": prompt},
+        ]
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json",
+        }
+        payload = {
+            "model": self.model,
+            "messages": messages,
+            "temperature": temperature,
+            # Native JSON mode — Groq guarantees the response is valid JSON.
+            "response_format": {"type": "json_object"},
+        }
+
+        async with httpx.AsyncClient(timeout=settings.AI_TIMEOUT_SECONDS) as client:
+            resp = await client.post(
+                f"{self.base_url}/chat/completions",
+                headers=headers,
+                json=payload,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            raw_text = data["choices"][0]["message"]["content"] or "{}"
+
+        parsed = json.loads(raw_text)
+        return schema.model_validate(parsed)
+
+
 class GeminiProvider(LLMProvider, EmbeddingProvider):
     """Google Gemini LLM and Embedding provider via HTTP REST API."""
 
@@ -812,16 +898,41 @@ _mock_provider = MockProvider()
 
 
 def get_llm_provider() -> LLMProvider:
+    """Return the active LLM provider based on the AI_PROVIDER setting.
+
+    Priority order:
+      1. groq  — Llama 3.3-70B on Groq LPU cloud (fast, free tier)
+      2. gemini — Google Gemini (kept as automatic fallback)
+      3. mock  — deterministic keyword-based provider for tests / offline
+    """
+    provider = settings.AI_PROVIDER.lower().strip()
+
+    if provider == "groq":
+        if not settings.GROQ_API_KEY:
+            logger.warning(
+                "AI_PROVIDER=groq but GROQ_API_KEY is not set. "
+                "Falling back to Gemini or mock provider."
+            )
+        else:
+            return GroqProvider(
+                api_key=settings.GROQ_API_KEY,
+                model=settings.GROQ_MODEL,
+            )
+
+    # Fallback: Gemini (also used when provider='gemini')
     if settings.GEMINI_API_KEY:
         return GeminiProvider(
             api_key=settings.GEMINI_API_KEY,
             model=settings.GEMINI_MODEL,
             embedding_model=settings.GEMINI_EMBEDDING_MODEL,
         )
+
+    logger.warning("No AI API key configured. Using MockProvider.")
     return _mock_provider
 
 
 def get_embedding_provider() -> EmbeddingProvider:
+    """Embeddings always use GeminiProvider (Groq does not support embeddings)."""
     if settings.GEMINI_API_KEY:
         return GeminiProvider(
             api_key=settings.GEMINI_API_KEY,

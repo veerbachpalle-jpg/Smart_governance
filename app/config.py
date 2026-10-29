@@ -1,4 +1,5 @@
 from typing import Any
+
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -21,6 +22,8 @@ class Settings(BaseSettings):
     MINIO_ROOT_PASSWORD: str = Field(default="minioadmin")
     MINIO_BUCKET: str = Field(default="complaints-attachments")
     MINIO_SECURE: bool = Field(default=False)
+    STORAGE_BACKEND: str = Field(default="local")
+    LOCAL_UPLOAD_DIR: str = Field(default="uploads")
 
     # JWT Security
     JWT_SECRET_KEY: str = Field(
@@ -32,9 +35,22 @@ class Settings(BaseSettings):
 
     # AI Assist & Guardrails
     AI_ENABLED: bool = Field(default=True)
+
+    # Provider selection: 'groq' (default) | 'gemini' | 'mock'
+    # Switch providers by changing this value in your .env — no code changes needed.
+    AI_PROVIDER: str = Field(default="groq")
+
+    # --- Groq (Llama 3.3-70B on LPU cloud) ---
+    GROQ_API_KEY: str | None = Field(default=None)
+    GROQ_MODEL: str = Field(default="openai/gpt-oss-120b")
+
+    # --- Google Gemini (kept as fallback) ---
     GEMINI_API_KEY: str | None = Field(default=None)
-    GEMINI_MODEL: str = Field(default="gemini-1.5-flash")
-    GEMINI_EMBEDDING_MODEL: str = Field(default="text-embedding-004")
+    # Keep defaults on currently supported stable Gemini endpoints. Deployments can
+    # override these without changing code when a provider model is rotated.
+    GEMINI_MODEL: str = Field(default="gemini-3.8-flash")
+    GEMINI_EMBEDDING_MODEL: str = Field(default="gemini-embedding-2")
+
     AI_CONFIDENCE_THRESHOLD: float = Field(default=0.7)
     AI_TIMEOUT_SECONDS: float = Field(default=10.0)
     AI_CIRCUIT_BREAKER_FAILURES: int = Field(default=3)
@@ -54,6 +70,25 @@ class Settings(BaseSettings):
             cleaned = v.upper().replace("MB", "").replace("M", "").strip()
             return int(cleaned)
         return int(v)
+
+    @field_validator("DATABASE_URL", mode="before")
+    @classmethod
+    def normalize_database_url(cls, value: Any) -> str:
+        """Render and similar hosts expose sync-style Postgres URLs."""
+        url = str(value)
+        if url.startswith("postgres://"):
+            return url.replace("postgres://", "postgresql+asyncpg://", 1)
+        if url.startswith("postgresql://"):
+            return url.replace("postgresql://", "postgresql+asyncpg://", 1)
+        return url
+
+    @field_validator("STORAGE_BACKEND")
+    @classmethod
+    def validate_storage_backend(cls, value: str) -> str:
+        normalized = value.strip().lower()
+        if normalized not in {"local", "minio"}:
+            raise ValueError("STORAGE_BACKEND must be either 'local' or 'minio'")
+        return normalized
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
