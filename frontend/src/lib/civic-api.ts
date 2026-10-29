@@ -338,7 +338,23 @@ export const civicApi = {
     reason: string,
     overrideValue?: string,
   ): Promise<void> {
-    if (isDemo) return;
+    if (isDemo) {
+      // Simulate triage decision in demo mode by updating demoRows
+      const index = demoRows.findIndex((r) => r.id === complaint.id);
+      if (index !== -1) {
+        const updated = { ...demoRows[index] } as any;
+        if (recommendation === "Department routing") {
+          updated.department = overrideValue || complaint.department;
+        } else {
+          updated.priority = overrideValue || complaint.priority;
+        }
+        updated.status = decision === "Reject" ? "rejected" : "in_progress";
+        demoRows.splice(index, 1, updated);
+      }
+      return;
+    }
+
+
     if (!complaint.backendId) throw new ApiError("Complaint not found.", 404);
     const decisionPath = decision.toLowerCase();
     if (recommendation === "Department routing") {
@@ -481,14 +497,29 @@ export const civicApi = {
     if (!isDemo) {
       const row = await this.list().then((items) => items.find((item) => item.id === id));
       if (!row?.backendId) throw new ApiError("Complaint not found.", 404);
-      if (action === "support") {
-        await request(`/complaints/${row.backendId}/support`, { method: "POST", body: "{}" });
-        return row;
+      switch (action) {
+        case "support":
+          await request(`/complaints/${row.backendId}/support`, { method: "POST", body: "{}" });
+          break;
+        case "confirm":
+          await request(`/cases/${row.backendId}/confirm`, { method: "POST", body: JSON.stringify(changes) });
+          break;
+        case "challenge":
+          await request(`/cases/${row.backendId}/challenge`, { method: "POST", body: JSON.stringify(changes) });
+          break;
+        case "propose-resolution":
+          await request(`/cases/${row.backendId}/resolve`, { method: "POST", body: JSON.stringify(changes) });
+          break;
+        case "assign":
+          await request(`/cases/${row.backendId}/assign`, { method: "POST", body: JSON.stringify(changes) });
+          break;
+        case "reassign":
+          await request(`/cases/${row.backendId}/reassign`, { method: "POST", body: JSON.stringify(changes) });
+          break;
+        default:
+          throw new ApiError(`Unsupported action "${action}" in production mode.`, 400);
       }
-      throw new ApiError(
-        "This action is available in the demonstration but is not connected to the municipal API yet.",
-        501,
-      );
+      return row;
     }
     await delay();
     const row = demoRows.find((item) => item.id === id);
