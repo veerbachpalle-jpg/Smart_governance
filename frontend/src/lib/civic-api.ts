@@ -134,7 +134,6 @@ export async function request<T>(
   if (tokens) headers.set("Authorization", `Bearer ${tokens.accessToken}`);
   const currentLang = typeof window !== "undefined" ? (localStorage.getItem("civic-language") || "en") : "en";
   headers.set("Accept-Language", currentLang);
-  headers.set("X-Preferred-Locale", currentLang);
   let response: Response;
   try {
     response = await fetch(`${base}${path}`, { ...options, headers });
@@ -153,16 +152,23 @@ export async function request<T>(
     return request<T>(path, options, false);
   }
   if (!response.ok) {
+    let serverDetail: string | undefined;
+    try {
+      const errJson = await response.json();
+      serverDetail = errJson.detail || errJson.message;
+    } catch {
+      // ignore
+    }
     const messages: Record<number, string> = {
-      401: "Please sign in to continue.",
+      401: serverDetail || "Invalid credentials. Please check your phone/email and password.",
       403: "Your role does not have permission for this action.",
       404: "No complaint was found with this tracking ID.",
       409: "This case was updated by someone else. Refresh before continuing.",
-      422: "Please check the information and try again.",
+      422: serverDetail || "Please check the information and try again.",
       429: "Too many requests. Please wait a moment and retry.",
     };
     throw new ApiError(
-      messages[response.status] ?? "The service is temporarily unavailable. Please try again.",
+      (serverDetail || messages[response.status]) ?? "The service is temporarily unavailable. Please try again.",
       response.status,
     );
   }
