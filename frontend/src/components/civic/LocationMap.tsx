@@ -2,13 +2,18 @@ import { useEffect, useRef, useState, useMemo } from 'react';
 import type { Complaint } from '@/lib/civic-types';
 
 export const DEPARTMENT_PALETTE: Record<string, { color: string; label: string }> = {
-  "Roads & Infrastructure": { color: "#ea580c", label: "Roads & Footpaths" },
-  "Water & Drainage": { color: "#0284c7", label: "Water & Drainage" },
-  "Electrical & Street Lighting": { color: "#eab308", label: "Street Lighting" },
-  "Solid Waste Management": { color: "#16a34a", label: "Waste Management" },
-  "Public Safety": { color: "#dc2626", label: "Public Safety" },
-  "Stormwater & Drainage": { color: "#06b6d4", label: "Stormwater" },
-  "Parks & Horticulture": { color: "#9333ea", label: "Parks" },
+  "Roads & Bridges": { color: "#ea580c", label: "Roads & Bridges" },
+  "Water Supply": { color: "#0284c7", label: "Water Supply" },
+  "Electricity & Streetlights": { color: "#eab308", label: "Electricity & Streetlights" },
+  "Sanitation & Solid Waste": { color: "#16a34a", label: "Sanitation & Solid Waste" },
+  "Stormwater & Drainage": { color: "#06b6d4", label: "Stormwater & Drainage" },
+  "Parks & Horticulture": { color: "#9333ea", label: "Parks & Horticulture" },
+  "Roads & footpaths": { color: "#ea580c", label: "Roads & Bridges" },
+  "Water supply": { color: "#0284c7", label: "Water Supply" },
+  "Street lighting": { color: "#eab308", label: "Electricity & Streetlights" },
+  "Waste management": { color: "#16a34a", label: "Sanitation & Solid Waste" },
+  "Stormwater & drainage": { color: "#06b6d4", label: "Stormwater & Drainage" },
+  "Parks & horticulture": { color: "#9333ea", label: "Parks & Horticulture" },
   "Awaiting assignment": { color: "#64748b", label: "Unassigned" },
 };
 
@@ -16,12 +21,11 @@ export function getDepartmentColor(deptOrCategory?: string): string {
   if (!deptOrCategory) return "#64748b";
   const norm = deptOrCategory.toLowerCase();
   if (/road|footpath|pavement|bridge/.test(norm)) return "#ea580c"; // Orange
-  if (/water|leak|supply|tap|pipe/.test(norm)) return "#0284c7"; // Sky Blue
-  if (/drain|sewer|stormwater|flood/.test(norm)) return "#06b6d4"; // Cyan
-  if (/light|electric|wire|lamp/.test(norm)) return "#eab308"; // Amber
-  if (/waste|garbage|trash|sanitat|rubbish/.test(norm)) return "#16a34a"; // Green
-  if (/park|garden|tree|horticult/.test(norm)) return "#9333ea"; // Purple
-  if (/safe|danger|fire|police|manhole/.test(norm)) return "#dc2626"; // Red
+  if (/drain|sewer|stormwater|flood|gutter/.test(norm)) return "#06b6d4"; // Cyan
+  if (/water|supply|tap|drinking|leak|pipe/.test(norm)) return "#0284c7"; // Sky Blue
+  if (/light|electric|wire|lamp|power/.test(norm)) return "#eab308"; // Amber
+  if (/waste|garbage|trash|sanitat|rubbish|solid/.test(norm)) return "#16a34a"; // Green
+  if (/park|garden|tree|horticult|branch/.test(norm)) return "#9333ea"; // Purple
   return "#64748b"; // Slate
 }
 

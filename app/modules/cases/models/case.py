@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from sqlalchemy import (
+    JSON,
     Boolean,
     DateTime,
     ForeignKey,
@@ -130,6 +131,13 @@ class CaseDepartment(Base, UUIDMixin):
         UniqueConstraint("case_id", "department_id", name="uq_case_department"),
         # Partial unique index ensuring exactly ONE lead department per case
         Index(
+            "uq_case_single_lead",
+            "case_id",
+            unique=True,
+            postgresql_where=(is_lead.is_(True)),
+            sqlite_where=(is_lead == 1),
+        ),
+        Index(
             "uq_case_lead_department",
             "case_id",
             unique=True,
@@ -166,6 +174,7 @@ class CaseReassignRequest(Base, UUIDMixin):
         nullable=True,
     )
     reason: Mapped[str] = mapped_column(Text, nullable=False)
+    evidence_urls: Mapped[Optional[list[str]]] = mapped_column(JSON, nullable=True)
     status: Mapped[str] = mapped_column(
         String(32), default="PENDING", index=True, nullable=False
     )  # PENDING, APPROVED, REJECTED

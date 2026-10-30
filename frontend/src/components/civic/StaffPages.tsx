@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Link } from "@tanstack/react-router";
 import { useQuery, useSuspenseQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
@@ -83,12 +83,109 @@ export function StaffPage({ view }: { view: string }) {
   const role = useRole();
   const { data: rows } = useSuspenseQuery(complaintsQuery);
   const { t } = useTranslation();
-  const [departmentFilter, setDepartmentFilter] = useState("all");
-  const [wardFilter, setWardFilter] = useState("all");
-  const rankedRows = rankRows(rows);
-  const filteredRows = filterAndRankRows(rows, departmentFilter, wardFilter);
+
+  // Read initial filter values from URL search params
+  const [departmentFilter, setDepartmentFilterState] = useState(() => {
+    if (typeof window !== "undefined") {
+      const sp = new URLSearchParams(window.location.search);
+      return sp.get("department") || "all";
+    }
+    return "all";
+  });
+  const [wardFilter, setWardFilterState] = useState(() => {
+    if (typeof window !== "undefined") {
+      const sp = new URLSearchParams(window.location.search);
+      return sp.get("ward") || "all";
+    }
+    return "all";
+  });
+  const [statusFilter, setStatusFilterState] = useState(() => {
+    if (typeof window !== "undefined") {
+      const sp = new URLSearchParams(window.location.search);
+      return sp.get("status") || "all";
+    }
+    return "all";
+  });
+  const [priorityFilter, setPriorityFilterState] = useState(() => {
+    if (typeof window !== "undefined") {
+      const sp = new URLSearchParams(window.location.search);
+      return sp.get("priority") || "all";
+    }
+    return "all";
+  });
+  const [sortBy, setSortByState] = useState(() => {
+    if (typeof window !== "undefined") {
+      const sp = new URLSearchParams(window.location.search);
+      return sp.get("sort") || "priority";
+    }
+    return "priority";
+  });
+  const [viewScope, setViewScope] = useState<"assigned" | "all">("all");
+
+  const syncUrlParams = (updates: Record<string, string>) => {
+    if (typeof window !== "undefined") {
+      const sp = new URLSearchParams(window.location.search);
+      for (const [k, v] of Object.entries(updates)) {
+        if (v && v !== "all") sp.set(k, v);
+        else sp.delete(k);
+      }
+      const newUrl = `${window.location.pathname}?${sp.toString()}`;
+      window.history.replaceState(null, "", newUrl);
+    }
+  };
+
+  const setDepartmentFilter = (val: string) => {
+    setDepartmentFilterState(val);
+    syncUrlParams({ department: val });
+  };
+  const setWardFilter = (val: string) => {
+    setWardFilterState(val);
+    syncUrlParams({ ward: val });
+  };
+  const setStatusFilter = (val: string) => {
+    setStatusFilterState(val);
+    syncUrlParams({ status: val });
+  };
+  const setPriorityFilter = (val: string) => {
+    setPriorityFilterState(val);
+    syncUrlParams({ priority: val });
+  };
+  const setSortBy = (val: string) => {
+    setSortByState(val);
+    syncUrlParams({ sort: val });
+  };
+
   const departmentOptions = [...new Set([...categories.map(item => item.department), ...rows.map(row => row.department)])].filter(Boolean);
   const wardOptions = [...new Set(rows.map(row => row.ward))].filter(Boolean);
+
+  // Filter rows
+  const filteredRows = useMemo(() => {
+    let result = [...rows];
+    if (departmentFilter !== "all") {
+      result = result.filter(r => r.department === departmentFilter);
+    }
+    if (wardFilter !== "all") {
+      result = result.filter(r => r.ward === wardFilter);
+    }
+    if (statusFilter !== "all") {
+      result = result.filter(r => r.status.toLowerCase() === statusFilter.toLowerCase());
+    }
+    if (priorityFilter !== "all") {
+      result = result.filter(r => (r.priorityBand || r.priority || "").toUpperCase() === priorityFilter.toUpperCase());
+    }
+    if (sortBy === "upvotes") {
+      result.sort((a, b) => (b.upvoteCount ?? 0) - (a.upvoteCount ?? 0));
+    } else if (sortBy === "recent") {
+      result.sort((a, b) => b.date.localeCompare(a.date));
+    } else if (sortBy === "sla") {
+      result.sort((a, b) => (a.slaDeadline || "").localeCompare(b.slaDeadline || ""));
+    } else {
+      result = rankRows(result);
+    }
+    return result;
+  }, [rows, departmentFilter, wardFilter, statusFilter, priorityFilter, sortBy]);
+
+  const rankedRows = rankRows(rows);
   if (!access[view])
     return (
       <div className="page-container">
@@ -133,7 +230,128 @@ export function StaffPage({ view }: { view: string }) {
           </span>
         }
       />
-      {["dashboard", "triage", "cases"].includes(view) && <div className="mb-6 flex flex-wrap gap-3 rounded-md border border-border bg-surface p-4"><label className="text-xs font-semibold">Filter by Department<select className="form-field mt-2 min-w-52" value={departmentFilter} onChange={event => setDepartmentFilter(event.target.value)}><option value="all">All departments</option>{departmentOptions.map(department => <option key={department} value={department}>{department}</option>)}</select></label><label className="text-xs font-semibold">Filter by Ward / Area<select className="form-field mt-2 min-w-52" value={wardFilter} onChange={event => setWardFilter(event.target.value)}><option value="all">All wards / areas</option>{wardOptions.map(ward => <option key={ward} value={ward}>{ward}</option>)}</select></label><span className="self-end text-[11px] text-muted-foreground">Priority order is preserved across filters.</span></div>}
+      {["dashboard", "triage", "cases"].includes(view) && (
+        <div className="mb-6 space-y-4">
+          {/* Operational Map with clustering, colors, and legend */}
+          <div className="panel overflow-hidden p-4">
+            <div className="mb-3 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                  Operational Geographic Map ({filteredRows.length} Cases)
+                </h3>
+                <span className="rounded bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
+                  Marker Clustering & Live Triage
+                </span>
+              </div>
+              <div className="flex items-center gap-2 text-xs">
+                <span className="text-muted-foreground">Scope:</span>
+                <button
+                  type="button"
+                  className={`rounded px-2.5 py-1 text-xs font-medium transition ${
+                    departmentFilter !== "all"
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-secondary text-secondary-foreground"
+                  }`}
+                  onClick={() => {
+                    if (departmentFilter !== "all") setDepartmentFilter("all");
+                    else setDepartmentFilter(departmentOptions[0] || "Roads & Infrastructure");
+                  }}
+                >
+                  {departmentFilter !== "all" ? `Assigned (${departmentFilter})` : "All Departments"}
+                </button>
+              </div>
+            </div>
+            <div className="h-80 w-full overflow-hidden rounded-lg">
+              <LocationMap complaints={filteredRows} large showLegend />
+            </div>
+          </div>
+
+          {/* Unified URL-synced Filters Bar */}
+          <div className="flex flex-wrap items-center gap-3 rounded-md border border-border bg-surface p-4">
+            <label className="text-xs font-semibold">
+              Department
+              <select
+                className="form-field mt-1.5 min-w-44"
+                value={departmentFilter}
+                onChange={(e) => setDepartmentFilter(e.target.value)}
+              >
+                <option value="all">All Departments</option>
+                {departmentOptions.map((dept) => (
+                  <option key={dept} value={dept}>
+                    {dept}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="text-xs font-semibold">
+              Ward / Area
+              <select
+                className="form-field mt-1.5 min-w-40"
+                value={wardFilter}
+                onChange={(e) => setWardFilter(e.target.value)}
+              >
+                <option value="all">All Wards / Areas</option>
+                {wardOptions.map((ward) => (
+                  <option key={ward} value={ward}>
+                    {ward}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="text-xs font-semibold">
+              Status
+              <select
+                className="form-field mt-1.5 min-w-36"
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+              >
+                <option value="all">All Statuses</option>
+                <option value="submitted">Submitted</option>
+                <option value="in_progress">In Progress</option>
+                <option value="review">Review Window</option>
+                <option value="reopened">Reopened</option>
+                <option value="challenged">Challenged</option>
+                <option value="resolved">Resolved</option>
+              </select>
+            </label>
+
+            <label className="text-xs font-semibold">
+              Priority Band
+              <select
+                className="form-field mt-1.5 min-w-36"
+                value={priorityFilter}
+                onChange={(e) => setPriorityFilter(e.target.value)}
+              >
+                <option value="all">All Priorities</option>
+                <option value="CRITICAL">Critical</option>
+                <option value="HIGH">High</option>
+                <option value="MEDIUM">Medium</option>
+                <option value="LOW">Low</option>
+              </select>
+            </label>
+
+            <label className="text-xs font-semibold">
+              Sort By
+              <select
+                className="form-field mt-1.5 min-w-40"
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+              >
+                <option value="priority">Priority Score</option>
+                <option value="upvotes">Citizen Upvotes</option>
+                <option value="sla">SLA Urgency</option>
+                <option value="recent">Most Recent</option>
+              </select>
+            </label>
+
+            <div className="ml-auto self-end text-[11px] text-muted-foreground">
+              {filteredRows.length} matching complaints · Query synced to URL
+            </div>
+          </div>
+        </div>
+      )}
       {view === "dashboard" && (
         <>
           <div className="mb-7 flex items-center gap-3 border-y border-border bg-secondary px-5 py-4">
@@ -704,6 +922,18 @@ export function StaffCase({ id }: { id: string }) {
               <ArrowRight />
             </Button>
           )}
+          {["in_progress", "reopened", "submitted"].includes(row.status) && (
+            <Button
+              variant="outline"
+              onClick={() => {
+                setAction("assign");
+                setReason("");
+              }}
+            >
+              Request Reassignment
+              <SlidersHorizontal />
+            </Button>
+          )}
           {["in_progress", "reopened"].includes(row.status) && (
             <Button
               onClick={() => {
@@ -713,6 +943,18 @@ export function StaffCase({ id }: { id: string }) {
             >
               Propose resolution
               <FileCheck2 />
+            </Button>
+          )}
+          {role === "supervisor" && (
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setAction("override-priority");
+                setReason("");
+              }}
+            >
+              Override Priority
+              <AlertTriangle />
             </Button>
           )}
           {["review", "challenged", "resolved"].includes(row.status) && (
@@ -798,15 +1040,79 @@ export function StaffCase({ id }: { id: string }) {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              {action === "assign" ? "Request reassignment" : "Propose a resolution"}
+              {action === "assign"
+                ? "Request Jurisdictional Reassignment"
+                : action === "override-priority"
+                  ? "Supervisor Priority Override"
+                  : "Propose a resolution"}
             </DialogTitle>
             <DialogDescription>
               {action === "assign"
-                ? "One lead department remains accountable for the case."
-                : "A human officer must inspect the physical fix. Evidence and notes are required; this does not mark the case resolved."}
+                ? "Request transfer of accountable lead department with mandatory audited reasoning."
+                : action === "override-priority"
+                  ? "Direct supervisor override of case priority with immediate composite score recalculation."
+                  : "A human officer must inspect the physical fix. Evidence and notes are required; this does not mark the case resolved."}
             </DialogDescription>
           </DialogHeader>
-          {action === "assign" ? (
+          {action === "override-priority" ? (
+            <>
+              <label htmlFor="override-priority-select" className="text-xs font-semibold">
+                Target Priority Level
+              </label>
+              <select
+                id="override-priority-select"
+                className="form-field"
+                value={priority}
+                onChange={(e) => setPriority(e.target.value)}
+              >
+                <option value="CRITICAL">Critical</option>
+                <option value="HIGH">High</option>
+                <option value="MEDIUM">Medium</option>
+                <option value="LOW">Low</option>
+              </select>
+              <label htmlFor="override-prio-reason" className="text-xs font-semibold">
+                Supervisory Justification Note (Required)
+              </label>
+              <textarea
+                id="override-prio-reason"
+                className="form-field min-h-24"
+                placeholder="Explain the reason for this priority override..."
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+              />
+              <Button
+                disabled={busy || reason.trim().length < 5}
+                onClick={async () => {
+                  setBusy(true);
+                  try {
+                    await update(
+                      {
+                        priority: priority as Complaint["priority"],
+                        activity: [
+                          {
+                            title: `Priority overridden to ${priority}`,
+                            note: reason,
+                            department: row.department,
+                            date: new Date().toISOString().slice(0, 10),
+                            public: true,
+                          },
+                          ...row.activity,
+                        ],
+                      },
+                      "override-priority",
+                    );
+                    setAction("");
+                    toast.success("Case priority updated.");
+                  } finally {
+                    setBusy(false);
+                  }
+                }}
+              >
+                Apply Priority Override
+                <AlertTriangle />
+              </Button>
+            </>
+          ) : action === "assign" ? (
             <>
               <label htmlFor="assign-dept" className="text-xs">
                 New accountable department
@@ -1359,21 +1665,21 @@ const falseNegatives = [
     id: "BLR-2026-01391",
     report: "Exposed wire near bus stop",
     ai: "Street lighting · Medium",
-    verified: "Public safety · Critical",
+    verified: "Electricity & Streetlights · Critical",
     reviewer: "Supervisor",
   },
   {
     id: "BLR-2026-01377",
     report: "Manhole cover shifted on main road",
     ai: "Roads & footpaths · Medium",
-    verified: "Public safety · High",
-    reviewer: "Department lead",
+    verified: "Roads & Bridges · High",
+    reviewer: "Roads Officer",
   },
   {
     id: "BLR-2026-01352",
     report: "Tree branch hanging over school gate",
-    ai: "Waste management · Low",
-    verified: "Public safety · High",
+    ai: "Sanitation & Solid Waste · Low",
+    verified: "Parks & Horticulture · High",
     reviewer: "Supervisor",
   },
 ];

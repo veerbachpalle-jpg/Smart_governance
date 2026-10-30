@@ -76,10 +76,27 @@ class IdentityService:
         return created_user
 
     async def login(self, req: LoginRequest) -> TokenResponse:
-        user = await self.user_repo.get_by_email(req.email)
+        user = None
+        if req.phone_number:
+            raw_phone = req.phone_number.strip().replace(" ", "").replace("-", "")
+            user = await self.user_repo.get_by_phone(raw_phone)
+            if not user and not raw_phone.startswith("+"):
+                # Try with Indian country code +91
+                user = await self.user_repo.get_by_phone(f"+91{raw_phone}")
+            if not user and raw_phone.startswith("+91"):
+                # Try without country code
+                user = await self.user_repo.get_by_phone(raw_phone[3:])
+        elif req.email:
+            user = await self.user_repo.get_by_email(req.email)
+        else:
+            raise UnauthorizedError(
+                detail="Either email or phone number is required.",
+                code="INVALID_CREDENTIALS",
+            )
+
         if not user or not verify_password(req.password, user.password_hash):
             raise UnauthorizedError(
-                detail="Invalid email or password.",
+                detail="Invalid credentials.",
                 code="INVALID_CREDENTIALS",
             )
 

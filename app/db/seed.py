@@ -59,46 +59,74 @@ DEPARTMENTS_DATA = [
 
 DEMO_USERS = [
     {
-        "email": "citizen@example.com",
+        "email": "citizen1@example.com",
         "phone": "+10000000001",
         "password": "CitizenDemo123!",
         "role": UserRole.CITIZEN.value,
-        "full_name": "Jane Doe (Citizen)",
-        "address": "42 Pine Street, Ward 12",
+        "full_name": "Citizen One",
+        "address": "42 Pine Street, Ward 1",
     },
     {
-        "email": "officer@example.com",
+        "email": "citizen2@example.com",
         "phone": "+10000000002",
+        "password": "CitizenDemo123!",
+        "role": UserRole.CITIZEN.value,
+        "full_name": "Citizen Two",
+        "address": "15 Maple Lane, Ward 4",
+    },
+    {
+        "email": "roads_officer@example.com",
+        "phone": "+10000000010",
         "password": "OfficerDemo123!",
         "role": UserRole.OFFICER.value,
         "dept_code": "ROADS",
         "member_role": "officer",
     },
     {
-        "email": "lead@example.com",
-        "phone": "+10000000003",
-        "password": "LeadDemo123!",
-        "role": UserRole.DEPARTMENT_LEAD.value,
-        "dept_code": "ROADS",
-        "member_role": "lead",
+        "email": "water_officer@example.com",
+        "phone": "+10000000011",
+        "password": "OfficerDemo123!",
+        "role": UserRole.OFFICER.value,
+        "dept_code": "WATER",
+        "member_role": "officer",
+    },
+    {
+        "email": "electricity_officer@example.com",
+        "phone": "+10000000012",
+        "password": "OfficerDemo123!",
+        "role": UserRole.OFFICER.value,
+        "dept_code": "ELEC",
+        "member_role": "officer",
+    },
+    {
+        "email": "sanitation_officer@example.com",
+        "phone": "+10000000013",
+        "password": "OfficerDemo123!",
+        "role": UserRole.OFFICER.value,
+        "dept_code": "SAN",
+        "member_role": "officer",
+    },
+    {
+        "email": "drainage_officer@example.com",
+        "phone": "+10000000014",
+        "password": "OfficerDemo123!",
+        "role": UserRole.OFFICER.value,
+        "dept_code": "DRAIN",
+        "member_role": "officer",
+    },
+    {
+        "email": "parks_officer@example.com",
+        "phone": "+10000000015",
+        "password": "OfficerDemo123!",
+        "role": UserRole.OFFICER.value,
+        "dept_code": "PARKS",
+        "member_role": "officer",
     },
     {
         "email": "supervisor@example.com",
-        "phone": "+10000000004",
+        "phone": "+10000000020",
         "password": "SupervisorDemo123!",
         "role": UserRole.SUPERVISOR.value,
-    },
-    {
-        "email": "admin@example.com",
-        "phone": "+10000000005",
-        "password": "AdminDemo123!",
-        "role": UserRole.ADMIN.value,
-    },
-    {
-        "email": "auditor@example.com",
-        "phone": "+10000000006",
-        "password": "AuditorDemo123!",
-        "role": UserRole.AUDITOR.value,
     },
 ]
 
@@ -186,7 +214,7 @@ SAMPLE_COMPLAINTS: list[dict[str, Any]] = [
         "latitude": 12.975,
         "longitude": 77.605,
         "ward_number": 1,
-        "status": "SUBMITTED",
+        "status": "IN_PROGRESS",
         "department": "ROADS",
         "priority": "HIGH",
     },
@@ -198,7 +226,7 @@ SAMPLE_COMPLAINTS: list[dict[str, Any]] = [
         "latitude": 12.969,
         "longitude": 77.601,
         "ward_number": 1,
-        "status": "MANUAL_TRIAGE",
+        "status": "IN_PROGRESS",
         "department": "DRAIN",
         "priority": "HIGH",
         "language": "kn",
@@ -256,16 +284,15 @@ SAMPLE_COMPLAINTS: list[dict[str, Any]] = [
     },
     {
         "tracking_number": "GRV-DEMO-0007",
-        "title": "Hazardous branch removed from playground",
-        "description": "A large broken branch over the playground was removed and the citizen accepted the verified resolution.",
+        "title": "Hazardous tree branch hanging over pedestrian path",
+        "description": "A large cracked tree branch is dangling precariously over the neighborhood walkway and children playground.",
         "address": "Neighbourhood Playground, Ward 2 North",
         "latitude": 13.018,
         "longitude": 77.601,
         "ward_number": 2,
-        "status": "CLOSED",
+        "status": "IN_PROGRESS",
         "department": "PARKS",
         "priority": "HIGH",
-        "proposal_status": "ACCEPTED",
     },
     {
         "tracking_number": "GRV-DEMO-0008",
@@ -279,13 +306,61 @@ SAMPLE_COMPLAINTS: list[dict[str, Any]] = [
         "department": "DRAIN",
         "priority": "CRITICAL",
     },
+    {
+        "tracking_number": "GRV-DEMO-0009",
+        "title": "Exposed high-voltage junction box near bus stand",
+        "description": "An electrical distribution box has an unlatched door with exposed live cables directly adjacent to the bus waiting shelter.",
+        "address": "Station Road, Ward 1 Central",
+        "latitude": 12.971,
+        "longitude": 77.592,
+        "ward_number": 1,
+        "status": "IN_PROGRESS",
+        "department": "ELEC",
+        "priority": "CRITICAL",
+    },
+    {
+        "tracking_number": "GRV-DEMO-0010",
+        "title": "Low water pressure in residential sector",
+        "description": "Drinking water supply pressure has dropped significantly over the past 48 hours for multiple residences on 4th Cross.",
+        "address": "4th Cross, Ward 3 South",
+        "latitude": 12.935,
+        "longitude": 77.602,
+        "ward_number": 3,
+        "status": "ROUTED",
+        "department": "WATER",
+        "priority": "MEDIUM",
+    },
+    {
+        "tracking_number": "GRV-DEMO-0011",
+        "title": "Illegal construction debris dumped along avenue",
+        "description": "Truckloads of masonry waste and debris have been dumped along the public pavement blocking foot traffic.",
+        "address": "Ring Road Sector 2, Ward 5 West",
+        "latitude": 12.973,
+        "longitude": 77.558,
+        "ward_number": 5,
+        "status": "IN_PROGRESS",
+        "department": "SAN",
+        "priority": "HIGH",
+    },
+    {
+        "tracking_number": "GRV-DEMO-0012",
+        "title": "Overgrown shrubbery blocking traffic intersection view",
+        "description": "Dense shrubs and untrimmed roadside greenery at the corner block driver visibility of approaching vehicles.",
+        "address": "Greenway Junction, Ward 2 North",
+        "latitude": 13.011,
+        "longitude": 77.612,
+        "ward_number": 2,
+        "status": "ROUTED",
+        "department": "PARKS",
+        "priority": "MEDIUM",
+    },
 ]
 
 
 async def seed_sample_workflows(
     session: Any,
-    citizen: User,
-    officer: User,
+    citizens: list[User],
+    officers_by_dept: dict[str, User],
     supervisor: User,
     departments: dict[str, Department],
     wards: dict[int, Ward],
@@ -298,6 +373,7 @@ async def seed_sample_workflows(
             select(Complaint).where(Complaint.tracking_number == tracking_number)
         )
         complaint = result.scalar_one_or_none()
+        citizen = citizens[(index - 1) % len(citizens)]
         if complaint is None:
             ward = wards[int(data["ward_number"])]
             complaint = Complaint(
@@ -318,7 +394,7 @@ async def seed_sample_workflows(
             )
             session.add(complaint)
             await session.flush()
-            logger.info("Created sample complaint: %s", tracking_number)
+            logger.info("Created sample complaint: %s (citizen: %s)", tracking_number, citizen.email)
 
         if data["status"] in {"SUBMITTED", "MANUAL_TRIAGE"}:
             continue
@@ -326,8 +402,11 @@ async def seed_sample_workflows(
         case_number = f"CASE-DEMO-{index:04d}"
         case_result = await session.execute(select(Case).where(Case.case_number == case_number))
         case = case_result.scalar_one_or_none()
+        dept_code = str(data["department"])
+        department = departments[dept_code]
+        assigned_officer = officers_by_dept.get(dept_code) or supervisor
+
         if case is None:
-            department = departments[str(data["department"])]
             case = Case(
                 case_number=case_number,
                 title=complaint.original_title,
@@ -335,7 +414,7 @@ async def seed_sample_workflows(
                 status=str(data["status"]),
                 priority=str(data["priority"]),
                 lead_department_id=department.id,
-                assigned_officer_id=officer.id,
+                assigned_officer_id=assigned_officer.id,
                 created_by_id=supervisor.id,
             )
             session.add(case)
@@ -362,7 +441,7 @@ async def seed_sample_workflows(
                     CaseActivity(
                         case_id=case.id,
                         complaint_id=complaint.id,
-                        actor_id=officer.id,
+                        actor_id=assigned_officer.id,
                         activity_type="STATUS_UPDATE",
                         visibility="CITIZEN_VISIBLE",
                         message=f"Current sample workflow status: {data['status']}.",
@@ -372,7 +451,7 @@ async def seed_sample_workflows(
                 ]
             )
             await session.flush()
-            logger.info("Created sample case: %s", case_number)
+            logger.info("Created sample case: %s (assigned: %s)", case_number, assigned_officer.email)
 
         proposal_status = data.get("proposal_status")
         if proposal_status:
@@ -383,7 +462,7 @@ async def seed_sample_workflows(
             if proposal is None:
                 proposal = ResolutionProposal(
                     case_id=case.id,
-                    proposing_officer_id=officer.id,
+                    proposing_officer_id=assigned_officer.id,
                     remediation_summary="Municipal crew completed the documented remediation shown in the sample evidence.",
                     root_cause_identified="Routine infrastructure wear and delayed preventive maintenance.",
                     officer_verified=True,
@@ -397,7 +476,7 @@ async def seed_sample_workflows(
                     Attachment(
                         case_id=case.id,
                         resolution_proposal_id=proposal.id,
-                        uploader_id=officer.id,
+                        uploader_id=assigned_officer.id,
                         file_url=f"seed://resolution/{tracking_number}.jpg",
                         file_name=f"{tracking_number.lower()}-resolution.jpg",
                         mime_type="image/jpeg",
@@ -417,7 +496,7 @@ async def seed_sample_workflows(
                         CitizenChallenge(
                             case_id=case.id,
                             resolution_proposal_id=proposal.id,
-                            citizen_id=citizen.id,
+                            citizen_id=complaint.citizen_id,
                             challenge_type="RESOLUTION",
                             reason="The open utility hole remains unsafe despite the proposed resolution.",
                             status="PENDING",
@@ -531,10 +610,23 @@ async def seed() -> None:
                 user_map[str(u["email"])] = existing_user
                 logger.info("User already exists: %s", u["email"])
 
+        citizens: list[User] = [
+            user_map["citizen1@example.com"],
+            user_map["citizen2@example.com"],
+        ]
+        officers_by_dept: dict[str, User] = {
+            "ROADS": user_map["roads_officer@example.com"],
+            "WATER": user_map["water_officer@example.com"],
+            "ELEC": user_map["electricity_officer@example.com"],
+            "SAN": user_map["sanitation_officer@example.com"],
+            "DRAIN": user_map["drainage_officer@example.com"],
+            "PARKS": user_map["parks_officer@example.com"],
+        }
+
         await seed_sample_workflows(
             session=session,
-            citizen=user_map["citizen@example.com"],
-            officer=user_map["officer@example.com"],
+            citizens=citizens,
+            officers_by_dept=officers_by_dept,
             supervisor=user_map["supervisor@example.com"],
             departments=dept_map,
             wards=ward_map,

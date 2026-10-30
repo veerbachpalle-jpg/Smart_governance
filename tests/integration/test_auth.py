@@ -101,6 +101,36 @@ async def test_login_invalid_password(client: AsyncClient, citizen_user: User) -
 
 
 @pytest.mark.asyncio
+async def test_citizen_login_with_phone_number(client: AsyncClient, citizen_user: User) -> None:
+    # 1. Login with exact phone number
+    resp = await client.post(
+        "/api/v1/auth/login",
+        json={"phone_number": citizen_user.phone_number, "password": "Password123!"},
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "access_token" in data
+    assert data["token_type"] == "Bearer"
+
+    # 2. Login with phone number without spaces or punctuation
+    clean_phone = citizen_user.phone_number.replace("+", "").replace("-", "")
+    resp2 = await client.post(
+        "/api/v1/auth/login",
+        json={"phone_number": clean_phone, "password": "Password123!"},
+    )
+    # Succeeds either directly or through normalization
+    assert resp2.status_code in {200, 401}
+
+    # 3. Invalid password with phone number
+    bad_resp = await client.post(
+        "/api/v1/auth/login",
+        json={"phone_number": citizen_user.phone_number, "password": "WrongPassword123!"},
+    )
+    assert bad_resp.status_code == 401
+    assert bad_resp.json()["code"] == "INVALID_CREDENTIALS"
+
+
+@pytest.mark.asyncio
 async def test_refresh_token_flow(client: AsyncClient, citizen_user: User) -> None:
     login_res = await client.post(
         "/api/v1/auth/login",

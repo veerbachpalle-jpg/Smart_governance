@@ -1,12 +1,13 @@
 export type Status =
   "submitted" | "in_progress" | "review" | "resolved" | "challenged" | "reopened";
-export type Role = "officer" | "lead" | "supervisor" | "admin" | "auditor";
+export type Role = "citizen" | "officer" | "supervisor" | "lead" | "admin" | "auditor";
 export type Category =
   | "Roads & footpaths"
-  | "Water & drainage"
+  | "Water supply"
   | "Street lighting"
   | "Waste management"
-  | "Public safety";
+  | "Stormwater & drainage"
+  | "Parks & horticulture";
 export interface Activity {
   title: string;
   note: string;

@@ -107,11 +107,13 @@ async def handle_whatsapp_post(
     media_content_type: Optional[str] = None
     is_form_request = False
 
+    message_id: Optional[str] = None
     if "application/x-www-form-urlencoded" in content_type or "multipart/form-data" in content_type:
         is_form_request = True
         form_data = await request.form()
         sender_phone = str(form_data.get("From") or "")
         body_text = str(form_data.get("Body") or "") if form_data.get("Body") else None
+        message_id = str(form_data.get("MessageSid") or form_data.get("SmsMessageSid") or "") or None
 
         raw_lat = form_data.get("Latitude")
         raw_lon = form_data.get("Longitude")
@@ -149,6 +151,7 @@ async def handle_whatsapp_post(
                     )
 
                 msg_item = messages[0]
+                message_id = str(msg_item.get("id", "")) or None
                 sender_phone = str(msg_item.get("from", ""))
                 msg_type = msg_item.get("type", "")
 
@@ -178,6 +181,7 @@ async def handle_whatsapp_post(
                 or payload.get("phone_number")
                 or ""
             )
+            message_id = str(payload.get("MessageSid") or payload.get("id") or "") or None
             body_text = payload.get("Body") or payload.get("body") or payload.get("text")
             if "Latitude" in payload or "latitude" in payload:
                 lat = float(payload.get("Latitude") or payload.get("latitude") or 0.0)
@@ -211,7 +215,7 @@ async def handle_whatsapp_post(
     )
 
     service = WhatsAppService(db_session)
-    reply_text = await service.process_inbound_message(user, inbound_msg)
+    reply_text = await service.process_inbound_message(user, inbound_msg, message_id=message_id)
 
     # 3. Format response according to caller type
     if is_form_request:

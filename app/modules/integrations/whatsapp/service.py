@@ -174,10 +174,20 @@ class WhatsAppService:
         self,
         user: User,
         msg: WhatsAppInboundMessage,
+        message_id: Optional[str] = None,
     ) -> str:
         """Processes an inbound citizen message through the conversational state machine."""
         phone = user.phone_number
         body_text = (msg.body or "").strip()
+
+        # ------------------------------------------------------------------
+        # 0. Message ID deduplication (Meta/Twilio)
+        # ------------------------------------------------------------------
+        if message_id:
+            msg_dup = await self.session_store.is_duplicate(phone, f"msgid:{message_id}", window_seconds=86400)
+            if msg_dup:
+                logger.info("Ignoring duplicate webhook message ID %s for %s", message_id, phone)
+                return "Duplicate message received."
 
         # ------------------------------------------------------------------
         # 1. Status Query Flow
@@ -188,6 +198,22 @@ class WhatsAppService:
 
         # Retrieve active session
         session_data = await self.session_store.get_session(phone)
+
+        # ------------------------------------------------------------------
+        # 1b. Check if user is in AWAITING_CONFIRMATION state
+        # ------------------------------------------------------------------
+        if session_data.get("state") == "AWAITING_CONFIRMATION":
+            cmd = body_text.strip().upper()
+            if cmd in {"YES", "Y", "SUBMIT", "HAAN", "हाँ", "ಹೌದು", "CONFIRM"}:
+                return await self._finalize_submission(user, session_data)
+            elif cmd in {"CANCEL", "NO", "N", "NAHI", "नहीं", "ಬೇಡ", "RESET"}:
+                await self.session_store.clear_session(phone)
+                return "❌ Grievance submission cancelled. You can report a new grievance anytime by sending a text or voice note."
+            else:
+                return (
+                    "Please reply with *YES* to submit your complaint or *CANCEL* to discard.\n\n"
+                    + self._render_confirmation_summary(session_data)
+                )
 
         # ------------------------------------------------------------------
         # 2. Audio / Voice Note Intake
@@ -321,13 +347,15 @@ class WhatsAppService:
         session_data["detected_language"] = res.language
         session_data["state"] = "AWAITING_LOCATION_OR_MEDIA"
 
-        # If location was already provided in message or session, submit immediately
+        # If location was already provided in message or session, transition to confirmation
         lat = msg.latitude or session_data.get("latitude")
         lon = msg.longitude or session_data.get("longitude")
         if lat is not None and lon is not None:
             session_data["latitude"] = lat
             session_data["longitude"] = lon
-            return await self._finalize_submission(user, session_data)
+            session_data["state"] = "AWAITING_CONFIRMATION"
+            await self.session_store.save_session(user.phone_number, session_data)
+            return self._render_confirmation_summary(session_data)
 
         await self.session_store.save_session(user.phone_number, session_data)
         return AWAITING_LOCATION_MESSAGE
@@ -358,7 +386,9 @@ class WhatsAppService:
         lat = session_data.get("latitude")
         lon = session_data.get("longitude")
         if lat is not None and lon is not None:
-            return await self._finalize_submission(user, session_data)
+            session_data["state"] = "AWAITING_CONFIRMATION"
+            await self.session_store.save_session(user.phone_number, session_data)
+            return self._render_confirmation_summary(session_data)
 
         await self.session_store.save_session(user.phone_number, session_data)
         return AWAITING_LOCATION_MESSAGE
@@ -379,9 +409,11 @@ class WhatsAppService:
         session_data["latitude"] = lat
         session_data["longitude"] = lon
 
-        # If draft description is already present, submit complaint
+        # If draft description is already present, transition to confirmation
         if session_data.get("draft_description"):
-            return await self._finalize_submission(user, session_data)
+            session_data["state"] = "AWAITING_CONFIRMATION"
+            await self.session_store.save_session(user.phone_number, session_data)
+            return self._render_confirmation_summary(session_data)
 
         # Awaiting description
         session_data["state"] = "AWAITING_DESCRIPTION"
@@ -405,12 +437,32 @@ class WhatsAppService:
             att_ids.append(str(attachment.id))
 
         if session_data.get("draft_description") and session_data.get("latitude") is not None:
-            return await self._finalize_submission(user, session_data)
+            session_data["state"] = "AWAITING_CONFIRMATION"
+            await self.session_store.save_session(user.phone_number, session_data)
+            return self._render_confirmation_summary(session_data)
 
         await self.session_store.save_session(user.phone_number, session_data)
         if session_data.get("draft_description"):
             return "Photo received! 📸 Please share your Location using WhatsApp's 📎 Location Pin to finalize."
         return "Photo received! 📸 Please share a description of the grievance via text or a voice note."
+
+    def _render_confirmation_summary(self, session_data: dict[str, Any]) -> str:
+        """Presents explicit summary confirmation before final submission."""
+        title = session_data.get("draft_title", "Grievance Report")
+        desc = session_data.get("draft_description", "")
+        lat = session_data.get("latitude", 0.0)
+        lon = session_data.get("longitude", 0.0)
+        photo_count = len(session_data.get("attachment_ids", []))
+        photos_txt = f"{photo_count} photo(s) attached" if photo_count > 0 else "None"
+
+        return (
+            "📝 *Please Confirm Your Grievance Submission:*\n\n"
+            f"• *Title:* {title}\n"
+            f"• *Description:* {desc}\n"
+            f"• *Location:* 📍 ({lat:.4f}, {lon:.4f})\n"
+            f"• *Photos:* 📸 {photos_txt}\n\n"
+            "Reply with *YES* to register this grievance, or *CANCEL* to discard."
+        )
 
     async def _finalize_submission(
         self,

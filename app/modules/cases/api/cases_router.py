@@ -9,13 +9,17 @@ from app.core.pagination import PaginatedResponse
 from app.db.session import get_db
 from app.modules.cases.schemas.case import (
     AddDepartmentRequest,
+    ApproveReassignRequest,
     AssignOfficerRequest,
     CaseFilterParams,
     CaseResponse,
     CreateCaseRequest,
     LinkComplaintRequest,
     ReassignCaseRequest,
+    ReassignRequestResponse,
+    RejectReassignRequest,
     SetLeadDepartmentRequest,
+    SupervisorPriorityOverrideRequest,
     TransitionCaseRequest,
 )
 from app.modules.cases.service.case_service import CaseService
@@ -215,5 +219,94 @@ async def request_reassignment(
 ) -> CaseResponse:
     service = CaseService(session)
     res = await service.request_reassign(current_user, case_id, payload)
+    await session.commit()
+    return res
+
+
+@cases_router.get(
+    "/reassign-requests/pending",
+    response_model=list[ReassignRequestResponse],
+    status_code=status.HTTP_200_OK,
+    summary="List pending case reassignment requests for supervisor review",
+)
+async def list_pending_reassignments(
+    case_id: uuid.UUID | None = Query(None),
+    current_user: User = Depends(require_roles(*SUPERVISOR_ROLES)),
+    session: AsyncSession = Depends(get_db),
+) -> list[ReassignRequestResponse]:
+    service = CaseService(session)
+    return await service.list_pending_reassignments(current_user, case_id)
+
+
+@cases_router.post(
+    "/{case_id}/reassign-requests/{request_id}/approve",
+    response_model=CaseResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Approve reassignment request, atomically swapping lead department and advancing state",
+)
+async def approve_reassignment(
+    case_id: uuid.UUID,
+    request_id: uuid.UUID,
+    payload: ApproveReassignRequest,
+    current_user: User = Depends(require_roles(*SUPERVISOR_ROLES)),
+    session: AsyncSession = Depends(get_db),
+) -> CaseResponse:
+    service = CaseService(session)
+    res = await service.approve_reassignment(current_user, case_id, request_id, payload)
+    await session.commit()
+    return res
+
+
+@cases_router.post(
+    "/{case_id}/reassign-requests/{request_id}/reject",
+    response_model=CaseResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Reject reassignment request with mandatory justification, preserving current lead",
+)
+async def reject_reassignment(
+    case_id: uuid.UUID,
+    request_id: uuid.UUID,
+    payload: RejectReassignRequest,
+    current_user: User = Depends(require_roles(*SUPERVISOR_ROLES)),
+    session: AsyncSession = Depends(get_db),
+) -> CaseResponse:
+    service = CaseService(session)
+    res = await service.reject_reassignment(current_user, case_id, request_id, payload)
+    await session.commit()
+    return res
+
+
+@cases_router.delete(
+    "/{case_id}/departments/{department_id}",
+    response_model=CaseResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Remove a supporting department from the case (cannot remove lead)",
+)
+async def remove_supporting_department(
+    case_id: uuid.UUID,
+    department_id: uuid.UUID,
+    current_user: User = Depends(require_roles(*SUPERVISOR_ROLES)),
+    session: AsyncSession = Depends(get_db),
+) -> CaseResponse:
+    service = CaseService(session)
+    res = await service.remove_supporting_department(current_user, case_id, department_id)
+    await session.commit()
+    return res
+
+
+@cases_router.post(
+    "/{case_id}/priority/override",
+    response_model=CaseResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Supervisor priority override with mandatory justification note",
+)
+async def override_priority(
+    case_id: uuid.UUID,
+    payload: SupervisorPriorityOverrideRequest,
+    current_user: User = Depends(require_roles(*SUPERVISOR_ROLES)),
+    session: AsyncSession = Depends(get_db),
+) -> CaseResponse:
+    service = CaseService(session)
+    res = await service.override_priority(current_user, case_id, payload)
     await session.commit()
     return res

@@ -26,8 +26,11 @@ class RegisterRequest(BaseModel):
 
 
 class LoginRequest(BaseModel):
-    email: EmailStr
+    email: Optional[EmailStr] = None
+    phone_number: Optional[str] = None
     password: str
+
+    model_config = ConfigDict(extra="ignore")
 
 
 class RefreshRequest(BaseModel):

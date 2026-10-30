@@ -264,14 +264,17 @@ The current Compose file uses development-oriented settings and credentials in i
 
 Running the seed command creates development accounts. These credentials are for **local development only**:
 
-| Role | Email | Password |
+| Role | Email / Phone | Password |
 |---|---|---|
-| Citizen | `citizen@example.com` | `CitizenDemo123!` |
-| Officer | `officer@example.com` | `OfficerDemo123!` |
-| Department lead | `lead@example.com` | `LeadDemo123!` |
-| Supervisor | `supervisor@example.com` | `SupervisorDemo123!` |
-| Administrator | `admin@example.com` | `AdminDemo123!` |
-| Auditor | `auditor@example.com` | `AuditorDemo123!` |
+| Citizen 1 | `citizen1@example.com` / `+10000000001` | `CitizenDemo123!` |
+| Citizen 2 | `citizen2@example.com` / `+10000000002` | `CitizenDemo123!` |
+| Roads Officer | `roads_officer@example.com` / `+10000000010` | `OfficerDemo123!` |
+| Water Officer | `water_officer@example.com` / `+10000000011` | `OfficerDemo123!` |
+| Electricity Officer | `electricity_officer@example.com` / `+10000000012` | `OfficerDemo123!` |
+| Sanitation Officer | `sanitation_officer@example.com` / `+10000000013` | `OfficerDemo123!` |
+| Drainage Officer | `drainage_officer@example.com` / `+10000000014` | `OfficerDemo123!` |
+| Parks Officer | `parks_officer@example.com` / `+10000000015` | `OfficerDemo123!` |
+| Supervisor | `supervisor@example.com` / `+10000000020` | `SupervisorDemo123!` |
 
 Do not reuse these credentials or retain seeded accounts in a production environment. The hosted frontend demo uses its own sample mode; these backend accounts are not required to explore it.
 

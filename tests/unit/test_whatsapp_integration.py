@@ -240,21 +240,30 @@ async def test_new_complaint_flow_text_then_location(
     assert session_data.get("state") == "AWAITING_LOCATION_OR_MEDIA"
     assert "Streetlight fixture broken" in session_data.get("draft_description", "")
 
-    # Step 2: Citizen sends Location Pin
+    # Step 2: Citizen sends Location Pin -> triggers summary confirmation
     msg_loc = WhatsAppInboundMessage(
         sender_phone="+919876540003",
         latitude=12.9716,
         longitude=77.5946,
     )
     reply_loc = await service.process_inbound_message(user, msg_loc)
+    assert "Please Confirm Your Grievance Submission" in reply_loc
+    assert "Reply with *YES* to register this grievance" in reply_loc
+
+    # Step 3: Citizen replies YES to confirm
+    msg_confirm = WhatsAppInboundMessage(
+        sender_phone="+919876540003",
+        body="YES",
+    )
+    reply_confirm = await service.process_inbound_message(user, msg_confirm)
 
     # Verify submission response format
-    assert "✅ Grievance Registered!" in reply_loc
-    assert "Tracking ID: GRV-" in reply_loc
-    assert "Department:" in reply_loc
-    assert "Status: Submitted (Awaiting Officer Triage)" in reply_loc
-    assert "Track anytime: https://frontend-nine-sandy-25.vercel.app/track" in reply_loc
-    assert "Or simply text \"STATUS\" to this chat." in reply_loc
+    assert "✅ Grievance Registered!" in reply_confirm
+    assert "Tracking ID: GRV-" in reply_confirm
+    assert "Department:" in reply_confirm
+    assert "Status: Submitted (Awaiting Officer Triage)" in reply_confirm
+    assert "Track anytime: https://frontend-nine-sandy-25.vercel.app/track" in reply_confirm
+    assert "Or simply text \"STATUS\" to this chat." in reply_confirm
 
     # Verify session cleared
     cleared_session = await store.get_session("+919876540003")
@@ -295,13 +304,21 @@ async def test_new_complaint_flow_voice_note_intake(
     reply_voice = await service.process_inbound_message(user, msg_voice)
     assert reply_voice == AWAITING_LOCATION_MESSAGE
 
-    # 3. Location Pin to complete registration
+    # 3. Location Pin prompts for confirmation
     msg_loc = WhatsAppInboundMessage(
         sender_phone="+919876540004",
         latitude=12.9720,
         longitude=77.5950,
     )
-    reply_final = await service.process_inbound_message(user, msg_loc)
+    reply_summary = await service.process_inbound_message(user, msg_loc)
+    assert "Please Confirm Your Grievance Submission" in reply_summary
+
+    # 4. Reply YES to confirm
+    msg_confirm = WhatsAppInboundMessage(
+        sender_phone="+919876540004",
+        body="YES",
+    )
+    reply_final = await service.process_inbound_message(user, msg_confirm)
     assert "✅ Grievance Registered!" in reply_final
     assert "Tracking ID:" in reply_final
 
@@ -381,7 +398,7 @@ async def test_twilio_webhook_post_flow(
     assert "<Response><Message>" in resp_1.text
     assert "We heard your report" in resp_1.text
 
-    # Step 2: Twilio form POST location
+    # Step 2: Twilio form POST location -> prompts confirmation
     resp_2 = await client.post(
         "/api/v1/integrations/whatsapp/webhook",
         data={
@@ -392,8 +409,20 @@ async def test_twilio_webhook_post_flow(
         headers={"Content-Type": "application/x-www-form-urlencoded"},
     )
     assert resp_2.status_code == 200
-    assert "✅ Grievance Registered!" in resp_2.text
-    assert "Tracking ID:" in resp_2.text
+    assert "Please Confirm Your Grievance Submission" in resp_2.text
+
+    # Step 3: Twilio form POST YES confirmation
+    resp_3 = await client.post(
+        "/api/v1/integrations/whatsapp/webhook",
+        data={
+            "From": "whatsapp:+919876541111",
+            "Body": "YES",
+        },
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+    )
+    assert resp_3.status_code == 200
+    assert "✅ Grievance Registered!" in resp_3.text
+    assert "Tracking ID:" in resp_3.text
 
 
 @pytest.mark.asyncio

@@ -53,10 +53,11 @@ const schema = z.object({
   description: z.string().min(20, "Describe the issue in at least 20 characters.").max(5000),
   category: z.enum([
     "Roads & footpaths",
-    "Water & drainage",
+    "Water supply",
     "Street lighting",
     "Waste management",
-    "Public safety",
+    "Stormwater & drainage",
+    "Parks & horticulture",
   ]),
 });
 type DescriptionForm = z.infer<typeof schema>;
@@ -1660,6 +1661,8 @@ function VoiceInput({ onText, language }: { onText: (text: string) => void; lang
   );
 }
 export function SignInPage() {
+  const [loginMode, setLoginMode] = useState<"citizen" | "staff">("citizen");
+  const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
@@ -1667,6 +1670,7 @@ export function SignInPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { t } = useTranslation();
+
   return (
     <div className="page-container">
       <div className="mx-auto max-w-sm py-10">
@@ -1675,41 +1679,100 @@ export function SignInPage() {
           title={t("signIn")}
           subtitle="Secure access to your municipal service account."
         />
-        <div className="mb-4 mt-6">
-          <p className="mb-2 text-[11px] font-semibold text-muted-foreground">Quick demo credentials:</p>
+
+        {/* Tab Switcher between Citizen (Phone) and Staff (Email) */}
+        <div className="mt-6 flex rounded-lg border border-border bg-muted/40 p-1 text-xs font-semibold">
+          <button
+            type="button"
+            className={`flex-1 rounded-md py-1.5 transition ${
+              loginMode === "citizen"
+                ? "bg-card text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+            onClick={() => {
+              setLoginMode("citizen");
+              setError("");
+            }}
+          >
+            Citizen (Phone)
+          </button>
+          <button
+            type="button"
+            className={`flex-1 rounded-md py-1.5 transition ${
+              loginMode === "staff"
+                ? "bg-card text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+            onClick={() => {
+              setLoginMode("staff");
+              setError("");
+            }}
+          >
+            Municipal Staff (Email)
+          </button>
+        </div>
+
+        <div className="mb-4 mt-4">
+          <p className="mb-2 text-[11px] font-semibold text-muted-foreground">Quick test accounts:</p>
           <div className="flex flex-wrap gap-1.5">
-            {[
-              { label: "Citizen", email: "citizen@example.com", pass: "CitizenDemo123!" },
-              { label: "Officer", email: "officer@example.com", pass: "OfficerDemo123!" },
-              { label: "Lead", email: "lead@example.com", pass: "LeadDemo123!" },
-              { label: "Supervisor", email: "supervisor@example.com", pass: "SupervisorDemo123!" },
-              { label: "Admin", email: "admin@example.com", pass: "AdminDemo123!" },
-              { label: "Auditor", email: "auditor@example.com", pass: "AuditorDemo123!" },
-            ].map((acc) => (
-              <button
-                key={acc.label}
-                type="button"
-                className="rounded border border-border bg-secondary px-2.5 py-1 text-[11px] font-medium transition hover:bg-primary hover:text-primary-foreground"
-                onClick={() => {
-                  setEmail(acc.email);
-                  setPassword(acc.pass);
-                }}
-              >
-                {acc.label}
-              </button>
-            ))}
+            {loginMode === "citizen" ? (
+              [
+                { label: "Citizen 1 (+10000000001)", phone: "+10000000001", pass: "CitizenDemo123!" },
+                { label: "Citizen 2 (+10000000002)", phone: "+10000000002", pass: "CitizenDemo123!" },
+              ].map((acc) => (
+                <button
+                  key={acc.label}
+                  type="button"
+                  className="rounded border border-border bg-secondary px-2.5 py-1 text-[11px] font-medium transition hover:bg-primary hover:text-primary-foreground"
+                  onClick={() => {
+                    setPhone(acc.phone);
+                    setPassword(acc.pass);
+                  }}
+                >
+                  {acc.label}
+                </button>
+              ))
+            ) : (
+              [
+                { label: "Roads Officer", email: "roads_officer@example.com", pass: "OfficerDemo123!" },
+                { label: "Water Officer", email: "water_officer@example.com", pass: "OfficerDemo123!" },
+                { label: "Electricity Officer", email: "electricity_officer@example.com", pass: "OfficerDemo123!" },
+                { label: "Sanitation Officer", email: "sanitation_officer@example.com", pass: "OfficerDemo123!" },
+                { label: "Drainage Officer", email: "drainage_officer@example.com", pass: "OfficerDemo123!" },
+                { label: "Parks Officer", email: "parks_officer@example.com", pass: "OfficerDemo123!" },
+                { label: "Supervisor", email: "supervisor@example.com", pass: "SupervisorDemo123!" },
+              ].map((acc) => (
+                <button
+                  key={acc.label}
+                  type="button"
+                  className="rounded border border-border bg-secondary px-2.5 py-1 text-[11px] font-medium transition hover:bg-primary hover:text-primary-foreground"
+                  onClick={() => {
+                    setEmail(acc.email);
+                    setPassword(acc.pass);
+                  }}
+                >
+                  {acc.label}
+                </button>
+              ))
+            )}
           </div>
         </div>
+
         <form
-          className="space-y-5"
+          className="space-y-4"
           onSubmit={async (event) => {
             event.preventDefault();
             setBusy(true);
             setError("");
             try {
+              const body =
+                loginMode === "citizen"
+                  ? { phone_number: phone.trim(), password }
+                  : { email: email.trim(), password };
+
               const session = await request<Tokens>("/auth/login", {
                 method: "POST",
-                body: JSON.stringify({ email, password }),
+                body: JSON.stringify(body),
               });
               setTokens(session);
               setDemoMode(false);
@@ -1728,20 +1791,43 @@ export function SignInPage() {
             }
           }}
         >
-          <div>
-            <label htmlFor="email" className="mb-2 block text-xs font-semibold">
-              Email address
-            </label>
-            <input
-              id="email"
-              type="email"
-              className="form-field"
-              autoComplete="email"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              required
-            />
-          </div>
+          {loginMode === "citizen" ? (
+            <div>
+              <label htmlFor="phone" className="mb-2 block text-xs font-semibold">
+                Mobile Phone Number (E.164)
+              </label>
+              <input
+                id="phone"
+                type="tel"
+                className="form-field"
+                placeholder="+91 98765 43210"
+                autoComplete="tel"
+                value={phone}
+                onChange={(event) => setPhone(event.target.value)}
+                required
+              />
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                Enter your mobile number with country code (e.g. +91 9876543210)
+              </p>
+            </div>
+          ) : (
+            <div>
+              <label htmlFor="email" className="mb-2 block text-xs font-semibold">
+                Official Staff Email
+              </label>
+              <input
+                id="email"
+                type="email"
+                className="form-field"
+                placeholder="officer@municipality.gov.in"
+                autoComplete="email"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                required
+              />
+            </div>
+          )}
+
           <div>
             <label htmlFor="password" className="mb-2 block text-xs font-semibold">
               Password
@@ -1756,11 +1842,13 @@ export function SignInPage() {
               required
             />
           </div>
+
           {error && (
             <p className="text-xs leading-relaxed text-destructive" role="alert">
               {error}
             </p>
           )}
+
           <Button className="h-11 w-full" disabled={busy} type="submit">
             {t("signIn")}
             <ArrowRight />

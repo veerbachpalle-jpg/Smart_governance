@@ -13,7 +13,8 @@ import {
   Droplets,
   Lightbulb,
   Trash2,
-  ShieldAlert,
+  Waves,
+  Trees,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { civicApi } from "@/lib/civic-api";
@@ -25,11 +26,12 @@ export const complaintsQuery = queryOptions({
   staleTime: 15000,
 });
 export const categories: { name: Category; icon: typeof Route; department: string }[] = [
-  { name: "Roads & footpaths", icon: Route, department: "Roads & Infrastructure" },
-  { name: "Water & drainage", icon: Droplets, department: "Water & Drainage" },
-  { name: "Street lighting", icon: Lightbulb, department: "Electrical & Street Lighting" },
-  { name: "Waste management", icon: Trash2, department: "Solid Waste Management" },
-  { name: "Public safety", icon: ShieldAlert, department: "Public Safety" },
+  { name: "Roads & footpaths", icon: Route, department: "Roads & Bridges" },
+  { name: "Water supply", icon: Droplets, department: "Water Supply" },
+  { name: "Street lighting", icon: Lightbulb, department: "Electricity & Streetlights" },
+  { name: "Waste management", icon: Trash2, department: "Sanitation & Solid Waste" },
+  { name: "Stormwater & drainage", icon: Waves, department: "Stormwater & Drainage" },
+  { name: "Parks & horticulture", icon: Trees, department: "Parks & Horticulture" },
 ];
 export function CategoryIcon({
   category,

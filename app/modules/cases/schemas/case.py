@@ -39,6 +39,38 @@ class AssignOfficerRequest(BaseModel):
 class ReassignCaseRequest(BaseModel):
     suggested_department_id: Optional[uuid.UUID] = None
     reason: str = Field(..., min_length=5, max_length=1000)
+    evidence_urls: Optional[list[str]] = None
+
+
+class ApproveReassignRequest(BaseModel):
+    decision_notes: Optional[str] = Field(default=None, max_length=1000)
+    new_lead_department_id: Optional[uuid.UUID] = None
+
+
+class RejectReassignRequest(BaseModel):
+    decision_notes: str = Field(..., min_length=5, max_length=1000)
+
+
+class SupervisorPriorityOverrideRequest(BaseModel):
+    priority: Literal["LOW", "MEDIUM", "HIGH", "CRITICAL"]
+    justification: str = Field(..., min_length=5, max_length=1000)
+
+
+class ReassignRequestResponse(BaseModel):
+    id: uuid.UUID
+    case_id: uuid.UUID
+    requested_by_id: uuid.UUID
+    current_department_id: uuid.UUID
+    suggested_department_id: Optional[uuid.UUID] = None
+    reason: str
+    evidence_urls: Optional[list[str]] = None
+    status: str
+    decided_by_id: Optional[uuid.UUID] = None
+    decision_notes: Optional[str] = None
+    created_at: datetime
+    decided_at: Optional[datetime] = None
+
+    model_config = ConfigDict(from_attributes=True)
 
 
 class CaseDepartmentResponse(BaseModel):

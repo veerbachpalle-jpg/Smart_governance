@@ -107,7 +107,35 @@ ALLOWED_TRANSITIONS: list[TransitionRule] = [
         visibility="INTERNAL",
         default_message="Field officer requested reassignment due to misrouting.",
     ),
-    # 8. REASSIGN_REQUESTED -> ROUTED
+    # 7b. ROUTED -> REASSIGN_REQUESTED
+    TransitionRule(
+        from_state="ROUTED",
+        to_state="REASSIGN_REQUESTED",
+        allowed_roles={
+            UserRole.DEPARTMENT_LEAD.value,
+            UserRole.OFFICER.value,
+            UserRole.SUPERVISOR.value,
+            UserRole.ADMIN.value,
+        },
+        activity_type="REASSIGNMENT_REQUESTED",
+        visibility="INTERNAL",
+        default_message="Department officer requested reassignment for newly routed case.",
+    ),
+    # 7c. TRIAGE_REVIEW -> REASSIGN_REQUESTED
+    TransitionRule(
+        from_state="TRIAGE_REVIEW",
+        to_state="REASSIGN_REQUESTED",
+        allowed_roles={
+            UserRole.DEPARTMENT_LEAD.value,
+            UserRole.OFFICER.value,
+            UserRole.SUPERVISOR.value,
+            UserRole.ADMIN.value,
+        },
+        activity_type="REASSIGNMENT_REQUESTED",
+        visibility="INTERNAL",
+        default_message="Officer requested reassignment from triage review.",
+    ),
+    # 8. REASSIGN_REQUESTED -> ROUTED (Approved reassignment)
     TransitionRule(
         from_state="REASSIGN_REQUESTED",
         to_state="ROUTED",
@@ -115,6 +143,15 @@ ALLOWED_TRANSITIONS: list[TransitionRule] = [
         activity_type="CASE_REASSIGNED",
         visibility="CITIZEN_VISIBLE",
         default_message="Case reassigned to new lead department by supervisor.",
+    ),
+    # 8b. REASSIGN_REQUESTED -> IN_PROGRESS (Rejected reassignment)
+    TransitionRule(
+        from_state="REASSIGN_REQUESTED",
+        to_state="IN_PROGRESS",
+        allowed_roles={UserRole.SUPERVISOR.value, UserRole.ADMIN.value},
+        activity_type="REASSIGNMENT_REJECTED",
+        visibility="CITIZEN_VISIBLE",
+        default_message="Reassignment request rejected by supervisor; case remains with current department.",
     ),
     # 9. IN_PROGRESS -> RESOLUTION_PROPOSED
     TransitionRule(
@@ -469,6 +506,9 @@ class CaseStateMachine:
                     "Reassignment request requires a substantive justification of at least 5 characters.",
                     code="REASSIGN_REASON_REQUIRED",
                 )
+            evidence_urls = None
+            if metadata and isinstance(metadata.get("evidence_urls"), list):
+                evidence_urls = metadata["evidence_urls"]
             # Record reassign request record
             reassign_req = CaseReassignRequest(
                 case_id=case.id,
@@ -476,9 +516,21 @@ class CaseStateMachine:
                 current_department_id=case.lead_department_id or uuid.uuid4(),
                 suggested_department_id=department_id,
                 reason=reason.strip(),
+                evidence_urls=evidence_urls,
                 status="PENDING",
             )
             self.session.add(reassign_req)
+
+            # Also add citizen-visible notice without leaking internal reasoning
+            citizen_activity = CaseActivity(
+                case_id=case.id,
+                actor_id=actor.id,
+                activity_type="ROUTING_UNDER_REVIEW",
+                visibility="CITIZEN_VISIBLE",
+                message="Routing is currently under review by municipal supervisors.",
+                activity_metadata={"status": "REASSIGN_REQUESTED"},
+            )
+            self.session.add(citizen_activity)
 
         if target_state == "RESOLUTION_PROPOSED":
             from sqlalchemy import desc, select

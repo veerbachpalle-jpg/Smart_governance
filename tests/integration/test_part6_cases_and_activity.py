@@ -466,3 +466,115 @@ async def test_case_activity_immutability(
     with pytest.raises(ConflictError):
         await db_session.flush()
     await db_session.rollback()
+
+
+# ========================================================
+# 6. Supervisor Reassignment Approval Queue, Priority Override & Department Operations
+# ========================================================
+
+
+@pytest.mark.asyncio
+async def test_supervisor_reassignment_approve_and_reject(
+    client: AsyncClient,
+    officer_token: str,
+    supervisor_token: str,
+    municipal_departments: list[Department],
+    triage_complaint: Complaint,
+) -> None:
+    dept_1 = municipal_departments[0]
+    dept_2 = municipal_departments[1]
+
+    # 1. Officer creates a case from complaint
+    c_resp = await client.post(
+        "/api/v1/cases",
+        headers={"Authorization": f"Bearer {officer_token}"},
+        json={"complaint_id": str(triage_complaint.id), "title": "Pothole remediation case"},
+    )
+    assert c_resp.status_code == 201
+    case_id = c_resp.json()["id"]
+
+    # 2. Add lead department
+    await client.put(
+        f"/api/v1/cases/{case_id}/lead",
+        headers={"Authorization": f"Bearer {officer_token}"},
+        json={"department_id": str(dept_1.id)},
+    )
+
+    # 3. Request reassignment with mandatory reason and optional evidence_urls
+    reassign_res = await client.post(
+        f"/api/v1/cases/{case_id}/reassign",
+        headers={"Authorization": f"Bearer {officer_token}"},
+        json={
+            "suggested_department_id": str(dept_2.id),
+            "reason": "Road is under water authority jurisdiction due to burst main pipe underneath.",
+            "evidence_urls": ["https://storage.example.com/burst_pipe.jpg"],
+        },
+    )
+    assert reassign_res.status_code == 200
+    assert reassign_res.json()["status"] == "REASSIGN_REQUESTED"
+
+    # 4. Supervisor views pending reassignments queue
+    pending_res = await client.get(
+        "/api/v1/cases/reassign-requests/pending",
+        headers={"Authorization": f"Bearer {supervisor_token}"},
+    )
+    assert pending_res.status_code == 200
+    pending_list = pending_res.json()
+    assert len(pending_list) >= 1
+    req_item = next(r for r in pending_list if r["case_id"] == case_id)
+    assert req_item["status"] == "PENDING"
+    assert req_item["suggested_department_id"] == str(dept_2.id)
+    assert req_item["evidence_urls"] == ["https://storage.example.com/burst_pipe.jpg"]
+
+    # 5. Citizen timeline during review shows "Routing is currently under review by municipal supervisors."
+    time_res = await client.get(
+        f"/api/v1/cases/citizen-timeline/{triage_complaint.id}",
+        headers={"Authorization": f"Bearer {supervisor_token}"},
+    )
+    assert time_res.status_code == 200
+    assert any("Routing is currently under review by municipal supervisors" in it["message"] for it in time_res.json())
+
+    # 6. Supervisor approves reassignment -> atomically swaps lead department and transitions to ROUTED
+    approve_res = await client.post(
+        f"/api/v1/cases/{case_id}/reassign-requests/{req_item['id']}/approve",
+        headers={"Authorization": f"Bearer {supervisor_token}"},
+        json={"decision_notes": "Confirmed: pipe defect belongs to water department."},
+    )
+    assert approve_res.status_code == 200
+    appr_data = approve_res.json()
+    assert appr_data["status"] == "ROUTED"
+    assert appr_data["lead_department_id"] == str(dept_2.id)
+
+    # 7. Priority override by supervisor
+    prio_res = await client.post(
+        f"/api/v1/cases/{case_id}/priority/override",
+        headers={"Authorization": f"Bearer {supervisor_token}"},
+        json={"priority": "CRITICAL", "justification": "Immediate flooding hazard for surrounding buildings."},
+    )
+    assert prio_res.status_code == 200
+    assert prio_res.json()["priority"] == "CRITICAL"
+
+    # 8. Add supporting department then remove supporting department
+    dept_3 = municipal_departments[2]
+    add_dept_res = await client.post(
+        f"/api/v1/cases/{case_id}/departments",
+        headers={"Authorization": f"Bearer {supervisor_token}"},
+        json={"department_id": str(dept_3.id), "is_lead": False},
+    )
+    assert add_dept_res.status_code == 200
+    assert len(add_dept_res.json()["departments"]) >= 2
+
+    # Cannot remove lead department
+    bad_del_res = await client.delete(
+        f"/api/v1/cases/{case_id}/departments/{dept_2.id}",
+        headers={"Authorization": f"Bearer {supervisor_token}"},
+    )
+    assert bad_del_res.status_code == 400
+
+    # Can remove supporting department
+    del_res = await client.delete(
+        f"/api/v1/cases/{case_id}/departments/{dept_3.id}",
+        headers={"Authorization": f"Bearer {supervisor_token}"},
+    )
+    assert del_res.status_code == 200
+

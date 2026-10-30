@@ -132,6 +132,9 @@ export async function request<T>(
   const headers = new Headers(options.headers);
   if (!(options.body instanceof FormData)) headers.set("Content-Type", "application/json");
   if (tokens) headers.set("Authorization", `Bearer ${tokens.accessToken}`);
+  const currentLang = typeof window !== "undefined" ? (localStorage.getItem("civic-language") || "en") : "en";
+  headers.set("Accept-Language", currentLang);
+  headers.set("X-Preferred-Locale", currentLang);
   let response: Response;
   try {
     response = await fetch(`${base}${path}`, { ...options, headers });
@@ -255,10 +258,11 @@ function frontendStatus(status: string): Status {
 
 function inferCategory(text: string): Complaint["category"] {
   const value = text.toLowerCase();
-  if (/water|drain|sewer|pipe|flood/.test(value)) return "Water & drainage";
-  if (/light|lamp|electric|wire/.test(value)) return "Street lighting";
-  if (/waste|garbage|trash|rubbish/.test(value)) return "Waste management";
-  if (/danger|safety|manhole|fire|collapse/.test(value)) return "Public safety";
+  if (/drain|sewer|flood|overflow|gutter/.test(value)) return "Stormwater & drainage";
+  if (/water|pipeline|leak|drinking|tap/.test(value)) return "Water supply";
+  if (/light|lamp|electric|wire|pole|bulb|power/.test(value)) return "Street lighting";
+  if (/waste|garbage|trash|rubbish|dump|bin|sweep/.test(value)) return "Waste management";
+  if (/park|tree|branch|garden|horticult|grass/.test(value)) return "Parks & horticulture";
   return "Roads & footpaths";
 }
 
