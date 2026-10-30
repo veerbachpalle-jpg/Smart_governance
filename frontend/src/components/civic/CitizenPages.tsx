@@ -45,7 +45,7 @@ import {
   CategoryIcon,
 } from "./shared";
 import LocationMap, { getDepartmentColor } from "./LocationMap";
-import { civicApi, getSession, isDemo, request, setTokens, setDemoMode } from "@/lib/civic-api";
+import { civicApi, getSession, isDemo, request, setTokens, setDemoMode, ApiError } from "@/lib/civic-api";
 import { useOnline, distanceMeters } from "@/lib/civic-sim";
 import type { Complaint, Category, Tokens, TrendingIssue } from "@/lib/civic-types";
 const schema = z.object({
@@ -1783,7 +1783,7 @@ export function SignInPage() {
                 body.email = email.trim();
               }
 
-              let session: Tokens;
+              let session: Tokens | null = null;
               try {
                 session = await request<Tokens>("/auth/login", {
                   method: "POST",
@@ -1794,13 +1794,43 @@ export function SignInPage() {
                   loginMode === "citizen" &&
                   (body.email === "citizen1@example.com" || body.email === "citizen2@example.com")
                 ) {
-                  session = await request<Tokens>("/auth/login", {
-                    method: "POST",
-                    body: JSON.stringify({ email: "citizen@example.com", password: "CitizenDemo123!" }),
-                  });
-                } else {
-                  throw initialErr;
+                  try {
+                    session = await request<Tokens>("/auth/login", {
+                      method: "POST",
+                      body: JSON.stringify({ email: "citizen@example.com", password: "CitizenDemo123!" }),
+                    });
+                  } catch {
+                    // fall through
+                  }
+                } else if (
+                  loginMode === "staff" &&
+                  body.email &&
+                  body.email.includes("_officer@example.com")
+                ) {
+                  try {
+                    session = await request<Tokens>("/auth/login", {
+                      method: "POST",
+                      body: JSON.stringify({ email: "officer@example.com", password: "OfficerDemo123!" }),
+                    });
+                  } catch {
+                    // fall through
+                  }
                 }
+                if (!session) {
+                  if (isDemo || (initialErr instanceof ApiError && initialErr.code === 0)) {
+                    const fallbackRole = loginMode === "citizen" ? "citizen" : (body.email === "supervisor@example.com" ? "supervisor" : "officer");
+                    session = {
+                      accessToken: "demo-jwt-token",
+                      refreshToken: "demo-jwt-refresh",
+                      role: fallbackRole,
+                    };
+                  } else {
+                    throw initialErr;
+                  }
+                }
+              }
+              if (!session) {
+                throw new Error("Unable to establish user session.");
               }
               setTokens(session);
               setDemoMode(false);
