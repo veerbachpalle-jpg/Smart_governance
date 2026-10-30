@@ -378,10 +378,22 @@ export const civicApi = {
         const updated = { ...demoRows[index] } as any;
         if (recommendation === "Department routing") {
           updated.department = overrideValue || complaint.department;
+          updated.departmentConfirmed = true;
         } else {
-          updated.priority = overrideValue || complaint.priority;
+          const mappedPriority = overrideValue === "CRITICAL" ? "Critical" : overrideValue === "HIGH" ? "High" : "Normal";
+          updated.priority = mappedPriority;
+          updated.priorityBand = (overrideValue as any) || "MEDIUM";
+          updated.priorityConfirmed = true;
         }
         updated.status = decision === "Reject" ? "rejected" : "in_progress";
+        const newAct = {
+          title: `${recommendation} ${decision}`,
+          note: reason || `Triage decision recorded by municipal officer: ${decision} (${overrideValue || complaint.department || complaint.priority}).`,
+          department: updated.department,
+          date: new Date().toISOString().slice(0, 10),
+          public: false,
+        };
+        updated.activity = [newAct, ...(updated.activity || [])];
         demoRows.splice(index, 1, updated);
       }
       return;
@@ -552,22 +564,40 @@ export const civicApi = {
           break;
         case "confirm": {
           const feedbackText = (changes as any)?.note || "Resolution verified and confirmed";
-          await request(`/cases/${caseId}/confirm`, {
-            method: "POST",
-            body: JSON.stringify({ feedback: feedbackText }),
-          });
+          try {
+            await request(`/complaints/${row.backendId}/confirm`, {
+              method: "POST",
+              body: JSON.stringify({ feedback: feedbackText }),
+            });
+          } catch {
+            await request(`/cases/${caseId}/confirm`, {
+              method: "POST",
+              body: JSON.stringify({ feedback: feedbackText }),
+            });
+          }
           break;
         }
         case "challenge": {
           const reason = (changes as any)?.challenge?.reason || "Citizen contested resolution";
-          await request(`/cases/${caseId}/challenge`, {
-            method: "POST",
-            body: JSON.stringify({
-              challenge_type: "RESOLUTION",
-              reason,
-              attachment_ids: [],
-            }),
-          });
+          try {
+            await request(`/complaints/${row.backendId}/challenge`, {
+              method: "POST",
+              body: JSON.stringify({
+                challenge_type: "RESOLUTION",
+                reason,
+                attachment_ids: [],
+              }),
+            });
+          } catch {
+            await request(`/cases/${caseId}/challenge`, {
+              method: "POST",
+              body: JSON.stringify({
+                challenge_type: "RESOLUTION",
+                reason,
+                attachment_ids: [],
+              }),
+            });
+          }
           break;
         }
         case "propose-resolution": {
@@ -626,7 +656,32 @@ export const civicApi = {
     await delay();
     const row = demoRows.find((item) => item.id === id);
     if (!row) throw new ApiError("Complaint not found.", 404);
-    const next = { ...row, ...changes };
+    const finalChanges: any = { ...changes };
+    if (action === "confirm") {
+      finalChanges.status = "resolved";
+      finalChanges.evidenceVerified = true;
+      const confirmAct = {
+        title: "Citizen Satisfaction Verified",
+        note: (changes as any)?.note || "Citizen verified satisfaction with resolution works. Case officially closed.",
+        department: row.department,
+        date: new Date().toISOString().slice(0, 10),
+        public: true,
+      };
+      finalChanges.activity = [confirmAct, ...(row.activity || [])];
+    } else if (action === "challenge") {
+      finalChanges.status = "challenged";
+      const challengeReason = (changes as any)?.challenge?.reason || "Citizen reopened case";
+      finalChanges.challenge = { reason: challengeReason, evidence: [] };
+      const reopenAct = {
+        title: "Case Reopened by Citizen Objection",
+        note: `Citizen contested resolution: ${challengeReason}. Escalated to municipal supervisor.`,
+        department: row.department,
+        date: new Date().toISOString().slice(0, 10),
+        public: true,
+      };
+      finalChanges.activity = [reopenAct, ...(row.activity || [])];
+    }
+    const next = { ...row, ...finalChanges };
     demoRows = demoRows.map((item) => (item.id === id ? next : item));
     return next;
   },

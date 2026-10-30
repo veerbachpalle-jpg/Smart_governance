@@ -290,6 +290,16 @@ class PriorityService:
         assessment.decided_at = now
         assessment.decision_reason = payload.notes
 
+        # Update linked case priority
+        try:
+            from app.modules.cases.repository.case_repository import CaseRepository
+            case_repo = CaseRepository(self.session)
+            case = await case_repo.get_case_for_complaint(complaint_id)
+            if case:
+                case.priority = assessment.final_suggested_priority
+        except Exception as c_err:
+            logger.debug("Case priority update: %s", c_err)
+
         await self.audit_service.record_event(
             entity_type="priority_assessment",
             entity_id=assessment.id,
@@ -327,6 +337,16 @@ class PriorityService:
         assessment.decided_by_id = officer.id
         assessment.decided_at = now
         assessment.decision_reason = payload.reason.strip()
+
+        # Update linked case priority
+        try:
+            from app.modules.cases.repository.case_repository import CaseRepository
+            case_repo = CaseRepository(self.session)
+            case = await case_repo.get_case_for_complaint(complaint_id)
+            if case:
+                case.priority = assessment.final_suggested_priority
+        except Exception as c_err:
+            logger.debug("Case priority update: %s", c_err)
 
         await self.audit_service.record_event(
             entity_type="priority_assessment",

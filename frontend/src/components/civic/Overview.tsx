@@ -85,7 +85,11 @@ export default function Overview() {
   async function handleConfirmSatisfaction(row: Complaint) {
     setBusyAction(true);
     try {
-      await civicApi.update(row.id, { note: "Citizen verified satisfaction with resolution." }, "confirm");
+      await civicApi.update(
+        row.id,
+        { status: "resolved", evidenceVerified: true, note: "Citizen verified satisfaction with resolution." },
+        "confirm",
+      );
       toast.success(`Resolution for ${row.id} confirmed and closed!`);
       await queryClient.invalidateQueries({ queryKey: ["complaints"] });
     } catch (err) {
@@ -107,7 +111,7 @@ export default function Overview() {
         { status: "challenged", challenge: { reason: reopenReason, evidence: [] } },
         "challenge",
       );
-      toast.success(`Case ${reopenTarget.id} reopened and routed back to department lead!`);
+      toast.success(`Case ${reopenTarget.id} reopened and notification dispatched to supervisor!`);
       setReopenTarget(null);
       setReopenReason("");
       await queryClient.invalidateQueries({ queryKey: ["complaints"] });

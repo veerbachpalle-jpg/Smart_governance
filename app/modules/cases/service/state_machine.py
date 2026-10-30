@@ -197,6 +197,34 @@ ALLOWED_TRANSITIONS: list[TransitionRule] = [
         visibility="CITIZEN_VISIBLE",
         default_message="Case closed following citizen confirmation or review window expiry.",
     ),
+    TransitionRule(
+        from_state="RESOLUTION_PROPOSED",
+        to_state="CLOSED",
+        allowed_roles={
+            UserRole.CITIZEN.value,
+            UserRole.OFFICER.value,
+            UserRole.DEPARTMENT_LEAD.value,
+            UserRole.SUPERVISOR.value,
+            UserRole.ADMIN.value,
+        },
+        activity_type="CASE_CLOSED",
+        visibility="CITIZEN_VISIBLE",
+        default_message="Case closed following citizen satisfaction confirmation.",
+    ),
+    TransitionRule(
+        from_state="RESOLVED",
+        to_state="CLOSED",
+        allowed_roles={
+            UserRole.CITIZEN.value,
+            UserRole.OFFICER.value,
+            UserRole.DEPARTMENT_LEAD.value,
+            UserRole.SUPERVISOR.value,
+            UserRole.ADMIN.value,
+        },
+        activity_type="CASE_CLOSED",
+        visibility="CITIZEN_VISIBLE",
+        default_message="Case closed following citizen satisfaction confirmation.",
+    ),
     # 12. CITIZEN_REVIEW -> CHALLENGED
     TransitionRule(
         from_state="CITIZEN_REVIEW",
@@ -209,6 +237,43 @@ ALLOWED_TRANSITIONS: list[TransitionRule] = [
         activity_type="RESOLUTION_CHALLENGED",
         visibility="CITIZEN_VISIBLE",
         default_message="Citizen disputed the proposed resolution.",
+    ),
+    TransitionRule(
+        from_state="RESOLUTION_PROPOSED",
+        to_state="CHALLENGED",
+        allowed_roles={
+            UserRole.CITIZEN.value,
+            UserRole.SUPERVISOR.value,
+            UserRole.ADMIN.value,
+        },
+        activity_type="RESOLUTION_CHALLENGED",
+        visibility="CITIZEN_VISIBLE",
+        default_message="Citizen disputed the proposed resolution.",
+    ),
+    TransitionRule(
+        from_state="RESOLVED",
+        to_state="CHALLENGED",
+        allowed_roles={
+            UserRole.CITIZEN.value,
+            UserRole.SUPERVISOR.value,
+            UserRole.ADMIN.value,
+        },
+        activity_type="RESOLUTION_CHALLENGED",
+        visibility="CITIZEN_VISIBLE",
+        default_message="Citizen disputed the resolution and requested case reopen.",
+    ),
+    TransitionRule(
+        from_state="ROUTED",
+        to_state="IN_PROGRESS",
+        allowed_roles={
+            UserRole.OFFICER.value,
+            UserRole.DEPARTMENT_LEAD.value,
+            UserRole.SUPERVISOR.value,
+            UserRole.ADMIN.value,
+        },
+        activity_type="WORK_STARTED",
+        visibility="CITIZEN_VISIBLE",
+        default_message="Remediation work has started.",
     ),
     # 13. REJECTED_WITH_REASON -> CHALLENGED
     TransitionRule(
@@ -573,18 +638,19 @@ class CaseStateMachine:
             )
             res_p = await self.session.execute(stmt_p)
             proposal = res_p.scalar_one_or_none()
-            if not proposal or not proposal.officer_verified:
-                raise BadRequestError(
-                    "Case cannot be closed without verified remediation evidence.",
-                    code="EVIDENCE_REQUIRED",
-                )
-            stmt_att = select(Attachment).where(Attachment.resolution_proposal_id == proposal.id)
-            res_att = await self.session.execute(stmt_att)
-            if not list(res_att.scalars().all()):
-                raise BadRequestError(
-                    "Case cannot be closed without at least one verified evidence attachment.",
-                    code="EVIDENCE_REQUIRED",
-                )
+            if actor.role != UserRole.CITIZEN.value:
+                if not proposal or not proposal.officer_verified:
+                    raise BadRequestError(
+                        "Case cannot be closed without verified remediation evidence.",
+                        code="EVIDENCE_REQUIRED",
+                    )
+                stmt_att = select(Attachment).where(Attachment.resolution_proposal_id == proposal.id)
+                res_att = await self.session.execute(stmt_att)
+                if not list(res_att.scalars().all()):
+                    raise BadRequestError(
+                        "Case cannot be closed without at least one verified evidence attachment.",
+                        code="EVIDENCE_REQUIRED",
+                    )
 
         if target_state == "CHALLENGED":
             if not reason or len(reason.strip()) < 5:

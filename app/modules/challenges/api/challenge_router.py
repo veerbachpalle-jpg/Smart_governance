@@ -82,9 +82,15 @@ async def get_latest_proposal(
     status_code=status.HTTP_200_OK,
     summary="Citizen confirms resolution satisfaction, permanently closing the case",
 )
+@challenges_router.post(
+    "/complaints/{case_id}/confirm",
+    response_model=CaseResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Citizen confirms resolution satisfaction by complaint ID, permanently closing the case",
+)
 async def confirm_resolution(
     case_id: uuid.UUID,
-    payload: ConfirmResolutionRequest,
+    payload: ConfirmResolutionRequest = ConfirmResolutionRequest(),
     current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_db),
 ) -> CaseResponse:
@@ -99,6 +105,12 @@ async def confirm_resolution(
     response_model=CitizenChallengeResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Citizen files a formal challenge against resolution, rejection, action, or priority",
+)
+@challenges_router.post(
+    "/complaints/{case_id}/challenge",
+    response_model=CitizenChallengeResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Citizen files a formal challenge by complaint ID, reopening the case",
 )
 async def file_challenge(
     case_id: uuid.UUID,

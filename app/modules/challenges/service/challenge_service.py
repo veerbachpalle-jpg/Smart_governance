@@ -10,6 +10,7 @@ from app.core.errors import BadRequestError, ForbiddenError, NotFoundError
 from app.core.outbox import enqueue_outbox_event
 from app.modules.activity.models.activity import CaseActivity
 from app.modules.audit.service.audit_service import AuditService
+from app.modules.cases.models.case import Case, CaseComplaint
 from app.modules.cases.repository.case_repository import CaseRepository
 from app.modules.cases.schemas.case import CaseResponse
 from app.modules.cases.service.case_service import CaseService
@@ -31,8 +32,10 @@ from app.modules.challenges.schemas.challenge import (
     ResolutionProposalResponse,
 )
 from app.modules.complaints.models.complaint import Attachment
+from app.modules.complaints.repository.complaint_repository import ComplaintRepository
 from app.modules.identity.models.user import User
 from app.modules.identity.schemas.identity import UserRole
+from app.modules.notifications.service.notification_service import NotificationService
 
 logger = logging.getLogger("app.challenges.service")
 
@@ -42,6 +45,7 @@ class ChallengeService:
         self.session = session
         self.repo = ChallengeRepository(session)
         self.case_repo = CaseRepository(session)
+        self.complaint_repo = ComplaintRepository(session)
         self.state_machine = CaseStateMachine(session)
         self.audit_service = AuditService(session)
         self.case_service = CaseService(session)
@@ -162,6 +166,34 @@ class ChallengeService:
 
         return self._build_proposal_response(proposal, payload.attachment_ids)
 
+    async def _resolve_case(self, case_id: uuid.UUID, current_user: User) -> Optional[Case]:
+        case = await self.case_repo.get_case_by_id(case_id)
+        if case:
+            return case
+        case = await self.case_repo.get_case_for_complaint(case_id)
+        if case:
+            return case
+        complaint = await self.complaint_repo.get_by_id(case_id)
+        if complaint:
+            now = datetime.now(timezone.utc)
+            case_number = f"CASE-{now.strftime('%Y%m%d')}-{uuid.uuid4().hex[:6].upper()}"
+            case = Case(
+                id=uuid.uuid4(),
+                case_number=case_number,
+                title=f"Case: {complaint.original_title}",
+                description=complaint.original_description,
+                status="CITIZEN_REVIEW",
+                priority="HIGH",
+                created_by_id=current_user.id,
+            )
+            self.session.add(case)
+            await self.session.flush()
+            cc = CaseComplaint(case_id=case.id, complaint_id=complaint.id, is_primary=True)
+            self.session.add(cc)
+            await self.session.flush()
+            return case
+        return None
+
     async def confirm_resolution(
         self,
         current_user: User,
@@ -169,7 +201,7 @@ class ChallengeService:
         payload: ConfirmResolutionRequest,
     ) -> CaseResponse:
         """Citizen explicitly confirms satisfaction with resolution, triggering permanent case closure."""
-        case = await self.case_repo.get_case_by_id(case_id)
+        case = await self._resolve_case(case_id, current_user)
         if not case:
             raise NotFoundError(f"Case '{case_id}' not found.", code="CASE_NOT_FOUND")
 
@@ -187,7 +219,6 @@ class ChallengeService:
                 code="EVIDENCE_REQUIRED",
             )
 
-        # Update proposal status
         proposal.status = "ACCEPTED"
 
         # Transition case to CLOSED
@@ -201,7 +232,7 @@ class ChallengeService:
             target_state="CLOSED",
             actor=current_user,
             reason=close_reason,
-            metadata={"proposal_id": str(proposal.id)},
+            metadata={"proposal_id": str(proposal.id)} if proposal else {},
         )
 
         full_case = await self.case_repo.get_case_by_id(case.id)
@@ -215,7 +246,7 @@ class ChallengeService:
         payload: CitizenChallengeRequest,
     ) -> CitizenChallengeResponse:
         """Citizen files a formal dispute against resolution, rejection, action, or priority."""
-        case = await self.case_repo.get_case_by_id(case_id)
+        case = await self._resolve_case(case_id, current_user)
         if not case:
             raise NotFoundError(f"Case '{case_id}' not found.", code="CASE_NOT_FOUND")
 
@@ -258,6 +289,41 @@ class ChallengeService:
                 "challenge_type": payload.challenge_type,
             },
         )
+
+        # Dispatch notification to supervisor
+        try:
+            from app.modules.identity.models.user import User as UserModel
+            stmt_sup = select(UserModel).where(
+                UserModel.role.in_(["supervisor", "admin"]),
+                UserModel.is_active.is_(True),
+            )
+            res_sup = await self.session.execute(stmt_sup)
+            supervisors = list(res_sup.scalars().all())
+
+            notif_service = NotificationService(self.session)
+            case_label = case.case_number or str(case.id)[:8]
+            notif_title = f"Case {case_label} Reopened by Citizen"
+            notif_msg = f"Citizen objected to resolution on '{case.title}'. Reason: {payload.reason.strip()}"
+
+            recipients = {s.email for s in supervisors if s.email}
+            if not recipients:
+                recipients = {"supervisor@example.com"}
+
+            for recipient in recipients:
+                await notif_service.send_notification(
+                    recipient=recipient,
+                    title=notif_title,
+                    message=notif_msg,
+                    notification_type="CASE_REOPENED",
+                    metadata={
+                        "case_id": str(case.id),
+                        "challenge_id": str(challenge.id),
+                        "reason": payload.reason.strip(),
+                    },
+                )
+            logger.info("Supervisor notification sent to %s for reopened case %s", recipients, case_label)
+        except Exception as n_err:
+            logger.warning("Failed to dispatch reopen notification to supervisor: %s", n_err)
 
         fresh_challenge = await self.repo.get_challenge_by_id(challenge.id)
         assert fresh_challenge is not None

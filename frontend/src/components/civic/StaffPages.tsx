@@ -20,6 +20,8 @@ import {
   Eye,
   Save,
   Upload,
+  CheckCircle2,
+  Wrench,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -801,40 +803,142 @@ export function StaffCase({ id }: { id: string }) {
                     ? "Safety rule hit: uncovered utility opening near a school; possible fall hazard."
                     : "Potential disruption to public access. Severity has not been verified.",
                 },
-              ].map((rec) => (
-                <section className="panel mb-5 p-5" key={rec.name}>
-                  <span className="status-pill status-progress">
-                    <Sparkles />
-                    AI suggestion · {rec.name === "Priority" ? "88" : "94"}% confidence · Sample
-                  </span>
-                  <h3 className="mt-4 text-xs font-semibold text-muted-foreground">{rec.name}</h3>
-                  <p className="mt-2 text-base font-bold">{rec.value}</p>
-                  <p
-                    className={`mt-3 text-xs leading-6 ${critical && rec.name === "Priority" ? "text-warning" : "text-muted-foreground"}`}
-                  >
-                    {rec.reason}
-                  </p>
-                  <div className="mt-4 flex gap-2">
-                    {["Accept", "Override", "Reject"].map((kind) => (
-                      <Button
-                        key={kind}
-                        size="sm"
-                        variant={kind === "Accept" ? "default" : "outline"}
-                        onClick={() => choose(rec.name, kind)}
-                      >
-                        {kind === "Accept" ? (
-                          <Check />
-                        ) : kind === "Reject" ? (
-                          <X />
+              ].map((rec) => {
+                const isConfirmed =
+                  rec.name === "Department routing"
+                    ? Boolean(row.departmentConfirmed || ["in_progress", "review", "resolved", "challenged"].includes(row.status))
+                    : Boolean(row.priorityConfirmed || ["in_progress", "review", "resolved", "challenged"].includes(row.status));
+
+                return (
+                  <section className="panel mb-5 p-5" key={rec.name}>
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className={`status-pill ${isConfirmed ? "status-resolved bg-success-soft text-success border border-success/30" : "status-progress"}`}>
+                        {isConfirmed ? (
+                          <>
+                            <Check className="size-3.5" />
+                            Confirmed · Official Finding
+                          </>
                         ) : (
-                          <SlidersHorizontal />
+                          <>
+                            <Sparkles className="size-3.5" />
+                            AI suggestion · {rec.name === "Priority" ? "88" : "94"}% confidence
+                          </>
                         )}
-                        {kind}
-                      </Button>
-                    ))}
-                  </div>
-                </section>
-              ))}
+                      </span>
+                      {isConfirmed && (
+                        <span className="text-[11px] font-semibold text-success">
+                          ✓ Saved to case
+                        </span>
+                      )}
+                    </div>
+                    <h3 className="mt-4 text-xs font-semibold text-muted-foreground">{rec.name}</h3>
+                    <p className="mt-2 text-base font-bold text-foreground">{rec.value}</p>
+                    <p
+                      className={`mt-3 text-xs leading-6 ${critical && rec.name === "Priority" ? "text-warning" : "text-muted-foreground"}`}
+                    >
+                      {rec.reason}
+                    </p>
+                    <div className="mt-4 flex flex-wrap items-center gap-2">
+                      {["Accept", "Override", "Reject"].map((kind) => (
+                        <Button
+                          key={kind}
+                          size="sm"
+                          variant={isConfirmed && kind === "Accept" ? "secondary" : kind === "Accept" ? "default" : "outline"}
+                          className="h-8 text-xs"
+                          onClick={() => choose(rec.name, kind)}
+                        >
+                          {kind === "Accept" ? (
+                            <Check className="size-3.5 mr-1" />
+                          ) : kind === "Reject" ? (
+                            <X className="size-3.5 mr-1" />
+                          ) : (
+                            <SlidersHorizontal className="size-3.5 mr-1" />
+                          )}
+                          {kind}
+                        </Button>
+                      ))}
+                    </div>
+                  </section>
+                );
+              })}
+
+              {/* NEXT OPERATIONAL ACTIONS WORKFLOW PANEL */}
+              <section className="panel mb-5 p-5 border-2 border-primary/30 bg-primary-soft/10">
+                <div className="flex items-center gap-2 text-primary font-bold text-sm">
+                  <CheckCircle2 className="size-4.5" />
+                  <span>Next Operational Actions</span>
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
+                  Proceed with operational remediation. Assign department staff, initiate physical work, or propose a resolution to enter the 7-day citizen review window.
+                </p>
+                <div className="mt-4 flex flex-wrap items-center gap-2.5">
+                  {["submitted", "routed"].includes(row.status) && (
+                    <Button
+                      size="sm"
+                      disabled={busy}
+                      className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold"
+                      onClick={async () => {
+                        setBusy(true);
+                        try {
+                          await civicApi.update(
+                            row.id,
+                            {
+                              status: "in_progress",
+                              department: row.department,
+                              activity: [
+                                {
+                                  title: "Remediation Work Initiated",
+                                  note: `Assigned to ${row.department} duty officer. Field work commenced.`,
+                                  department: row.department,
+                                  date: new Date().toISOString().slice(0, 10),
+                                  public: true,
+                                },
+                                ...(row.activity || []),
+                              ],
+                            },
+                            "assign",
+                          );
+                          await queryClient.invalidateQueries({ queryKey: ["complaints"] });
+                          toast.success("Case assigned and moved to IN PROGRESS!");
+                        } catch (e) {
+                          toast.error(e instanceof Error ? e.message : "Failed to start work.");
+                        } finally {
+                          setBusy(false);
+                        }
+                      }}
+                    >
+                      <Wrench className="size-3.5 mr-1.5" />
+                      Assign Duty Officer & Start Work
+                    </Button>
+                  )}
+
+                  {["in_progress", "reopened"].includes(row.status) && (
+                    <Button
+                      size="sm"
+                      className="bg-success hover:bg-success/90 text-success-foreground font-semibold"
+                      onClick={() => {
+                        setAction("resolve");
+                        setNote("");
+                      }}
+                    >
+                      <FileCheck2 className="size-3.5 mr-1.5" />
+                      Propose Resolution (Open 7-Day Review)
+                    </Button>
+                  )}
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setAction("assign");
+                      setReason("");
+                    }}
+                  >
+                    <SlidersHorizontal className="size-3.5 mr-1.5" />
+                    Reassign Lead Department
+                  </Button>
+                </div>
+              </section>
               <section className="panel p-5">
                 <h3 className="text-sm font-bold">Related reports</h3>
                 <p className="mt-2 text-xs text-muted-foreground">

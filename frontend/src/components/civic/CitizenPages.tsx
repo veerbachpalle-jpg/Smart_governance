@@ -263,7 +263,11 @@ export function ComplaintsPage() {
   async function handleConfirmSatisfaction(row: Complaint) {
     setBusyAction(true);
     try {
-      await civicApi.update(row.id, { note: "Citizen verified satisfaction with resolution." }, "confirm");
+      await civicApi.update(
+        row.id,
+        { status: "resolved", evidenceVerified: true, note: "Citizen verified satisfaction with resolution." },
+        "confirm",
+      );
       toast.success(`Resolution for ${row.id} confirmed and closed!`);
       await queryClient.invalidateQueries({ queryKey: ["complaints"] });
     } catch (err) {
@@ -285,7 +289,7 @@ export function ComplaintsPage() {
         { status: "challenged", challenge: { reason: reopenReason, evidence: [] } },
         "challenge",
       );
-      toast.success(`Case ${reopenTarget.id} reopened and routed to supervisor!`);
+      toast.success(`Case ${reopenTarget.id} reopened and notification dispatched to supervisor!`);
       setReopenTarget(null);
       setReopenReason("");
       await queryClient.invalidateQueries({ queryKey: ["complaints"] });
@@ -1348,7 +1352,7 @@ export function ComplaintDetail({ id }: { id: string }) {
       );
       await queryClient.invalidateQueries({ queryKey: ["complaints"] });
       setReviewOpen(false);
-      toast.success("Challenge submitted for independent review.");
+      toast.success("Case reopened and notification dispatched to supervisor!");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Could not submit challenge.");
     } finally {
@@ -1454,7 +1458,11 @@ export function ComplaintDetail({ id }: { id: string }) {
                   onClick={async () => {
                     setBusy(true);
                     try {
-                      await civicApi.update(row.id, { note: "Citizen verified satisfaction with resolution." }, "confirm");
+                      await civicApi.update(
+                        row.id,
+                        { status: "resolved", evidenceVerified: true, note: "Citizen verified satisfaction with resolution." },
+                        "confirm",
+                      );
                       toast.success("You confirmed satisfaction! The complaint is now verified and closed.");
                       await queryClient.invalidateQueries({ queryKey: ["complaints"] });
                     } catch (error) {

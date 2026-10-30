@@ -44,6 +44,9 @@ export interface Complaint {
   wardNumber?: number;
   resolution?: { notes: string; evidence: string[]; deadline: string; officer: string };
   challenge?: { reason: string; outcome?: string; evidence: string[] };
+  departmentConfirmed?: boolean;
+  priorityConfirmed?: boolean;
+  assignedOfficer?: string;
 }
 export interface TrendingIssue {
   id: string;

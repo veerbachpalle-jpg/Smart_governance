@@ -363,6 +363,38 @@ class RoutingService:
         if complaint:
             complaint.status = "ROUTED"
 
+        # Ensure or link to Case
+        try:
+            from app.modules.cases.models.case import Case, CaseDepartment, CaseComplaint
+            from app.modules.cases.repository.case_repository import CaseRepository
+            case_repo = CaseRepository(self.session)
+            case = await case_repo.get_case_for_complaint(complaint_id)
+            target_dept_id = rec.primary_department_id
+            if not case and complaint:
+                case_number = f"CASE-{now.strftime('%Y%m%d')}-{uuid.uuid4().hex[:6].upper()}"
+                case = Case(
+                    id=uuid.uuid4(),
+                    case_number=case_number,
+                    title=f"Case: {complaint.original_title}",
+                    description=complaint.original_description,
+                    status="ROUTED",
+                    priority="MEDIUM",
+                    lead_department_id=target_dept_id,
+                    created_by_id=officer.id,
+                )
+                self.session.add(case)
+                await self.session.flush()
+                cd = CaseDepartment(case_id=case.id, department_id=target_dept_id, is_lead=True, added_by_id=officer.id)
+                self.session.add(cd)
+                cc = CaseComplaint(case_id=case.id, complaint_id=complaint.id, is_primary=True)
+                self.session.add(cc)
+            elif case:
+                case.status = "ROUTED"
+                if target_dept_id:
+                    case.lead_department_id = target_dept_id
+        except Exception as c_err:
+            logger.debug("Case link during accept_routing: %s", c_err)
+
         await self.audit_service.record_event(
             entity_type="routing_recommendation",
             entity_id=rec.id,
@@ -405,6 +437,36 @@ class RoutingService:
         complaint = await self.complaint_repo.get_by_id(complaint_id)
         if complaint:
             complaint.status = "ROUTED"
+
+        # Ensure or link to Case
+        try:
+            from app.modules.cases.models.case import Case, CaseDepartment, CaseComplaint
+            from app.modules.cases.repository.case_repository import CaseRepository
+            case_repo = CaseRepository(self.session)
+            case = await case_repo.get_case_for_complaint(complaint_id)
+            if not case and complaint:
+                case_number = f"CASE-{now.strftime('%Y%m%d')}-{uuid.uuid4().hex[:6].upper()}"
+                case = Case(
+                    id=uuid.uuid4(),
+                    case_number=case_number,
+                    title=f"Case: {complaint.original_title}",
+                    description=complaint.original_description,
+                    status="ROUTED",
+                    priority="MEDIUM",
+                    lead_department_id=payload.department_id,
+                    created_by_id=officer.id,
+                )
+                self.session.add(case)
+                await self.session.flush()
+                cd = CaseDepartment(case_id=case.id, department_id=payload.department_id, is_lead=True, added_by_id=officer.id)
+                self.session.add(cd)
+                cc = CaseComplaint(case_id=case.id, complaint_id=complaint.id, is_primary=True)
+                self.session.add(cc)
+            elif case:
+                case.status = "ROUTED"
+                case.lead_department_id = payload.department_id
+        except Exception as c_err:
+            logger.debug("Case link during override_routing: %s", c_err)
 
         await self.audit_service.record_event(
             entity_type="routing_recommendation",
