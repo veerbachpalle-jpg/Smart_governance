@@ -69,6 +69,11 @@ class Settings(BaseSettings):
     WHATSAPP_ACCESS_TOKEN: str | None = Field(default=None)
     WHATSAPP_PHONE_NUMBER_ID: str | None = Field(default=None)
 
+    # WhatsApp / Twilio Webhook Signature Verification
+    WHATSAPP_APP_SECRET: str | None = Field(default=None)
+    TWILIO_AUTH_TOKEN: str | None = Field(default=None)
+    WHATSAPP_SIGNATURE_REQUIRED: bool = Field(default=True)
+
     # Security: CORS & Rate Limiting
     CORS_ORIGINS: str = Field(
         default="http://localhost:3000,http://localhost:5173,http://localhost:8000"

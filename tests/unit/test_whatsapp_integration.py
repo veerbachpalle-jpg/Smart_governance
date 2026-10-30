@@ -1,3 +1,10 @@
+import hashlib
+import hmac
+import json
+from base64 import b64encode
+from unittest.mock import patch
+from urllib.parse import urlencode
+
 import pytest
 from httpx import AsyncClient
 from sqlalchemy import select
@@ -18,6 +25,30 @@ from app.modules.integrations.whatsapp.user_resolver import (
     normalize_phone_number,
     resolve_or_create_whatsapp_citizen,
 )
+
+# ── Test helpers for webhook signature computation ────────────────────────────
+
+TEST_META_SECRET = "test_meta_app_secret_1234"
+TEST_TWILIO_TOKEN = "test_twilio_auth_token_5678"
+
+
+def _compute_meta_signature(body: bytes, secret: str = TEST_META_SECRET) -> str:
+    """Compute X-Hub-Signature-256 value for a given raw body."""
+    sig = hmac.new(secret.encode("utf-8"), body, hashlib.sha256).hexdigest()
+    return f"sha256={sig}"
+
+
+def _compute_twilio_signature(
+    url: str, params: dict[str, str], token: str = TEST_TWILIO_TOKEN
+) -> str:
+    """Compute X-Twilio-Signature value for a given URL and form params."""
+    data_str = url
+    for key in sorted(params.keys()):
+        data_str += key + params[key]
+    sig = b64encode(
+        hmac.new(token.encode("utf-8"), data_str.encode("utf-8"), hashlib.sha1).digest()
+    ).decode("utf-8")
+    return sig
 
 
 @pytest.fixture
@@ -263,7 +294,7 @@ async def test_new_complaint_flow_text_then_location(
     assert "Department:" in reply_confirm
     assert "Status: Submitted (Awaiting Officer Triage)" in reply_confirm
     assert "Track anytime: https://frontend-nine-sandy-25.vercel.app/track" in reply_confirm
-    assert "Or simply text \"STATUS\" to this chat." in reply_confirm
+    assert 'Or simply text "STATUS" to this chat.' in reply_confirm
 
     # Verify session cleared
     cleared_session = await store.get_session("+919876540003")
@@ -381,9 +412,13 @@ async def test_meta_webhook_verification(client: AsyncClient) -> None:
 
 
 @pytest.mark.asyncio
-async def test_twilio_webhook_post_flow(
+@patch.object(settings, "WHATSAPP_SIGNATURE_REQUIRED", False)
+@patch.object(settings, "ENVIRONMENT", "development")
+@patch.object(settings, "TWILIO_AUTH_TOKEN", None)
+async def test_twilio_webhook_post_flow_unsigned_dev(
     client: AsyncClient, sample_ward: Ward, sample_department: Department
 ) -> None:
+    """In dev mode with WHATSAPP_SIGNATURE_REQUIRED=False, unsigned requests are allowed."""
     # Step 1: Twilio form POST message
     resp_1 = await client.post(
         "/api/v1/integrations/whatsapp/webhook",
@@ -426,6 +461,35 @@ async def test_twilio_webhook_post_flow(
 
 
 @pytest.mark.asyncio
+@patch.object(settings, "WHATSAPP_APP_SECRET", TEST_META_SECRET)
+async def test_twilio_webhook_post_flow_signed(
+    client: AsyncClient, sample_ward: Ward, sample_department: Department
+) -> None:
+    """Twilio-style form POST with proper X-Twilio-Signature."""
+    with patch.object(settings, "TWILIO_AUTH_TOKEN", TEST_TWILIO_TOKEN):
+        # We need to compute the signature for the exact URL that the test client uses
+        base_url = "http://test/api/v1/integrations/whatsapp/webhook"
+        form_params = {
+            "From": "whatsapp:+919876541112",
+            "Body": "Huge pothole on middle of MG Road",
+        }
+        sig = _compute_twilio_signature(base_url, form_params)
+
+        resp_1 = await client.post(
+            "/api/v1/integrations/whatsapp/webhook",
+            data=form_params,
+            headers={
+                "Content-Type": "application/x-www-form-urlencoded",
+                "X-Twilio-Signature": sig,
+            },
+        )
+        assert resp_1.status_code == 200
+        assert "We heard your report" in resp_1.text
+
+
+@pytest.mark.asyncio
+@patch.object(settings, "WHATSAPP_APP_SECRET", TEST_META_SECRET)
+@patch.object(settings, "ENVIRONMENT", "development")
 async def test_meta_cloud_api_json_post_flow(
     client: AsyncClient, sample_ward: Ward, sample_department: Department
 ) -> None:
@@ -453,9 +517,16 @@ async def test_meta_cloud_api_json_post_flow(
             }
         ],
     }
+    raw_body = json.dumps(payload).encode("utf-8")
+    sig = _compute_meta_signature(raw_body)
+
     resp = await client.post(
         "/api/v1/integrations/whatsapp/webhook",
-        json=payload,
+        content=raw_body,
+        headers={
+            "Content-Type": "application/json",
+            "X-Hub-Signature-256": sig,
+        },
     )
     assert resp.status_code == 200
     data = resp.json()
@@ -463,8 +534,129 @@ async def test_meta_cloud_api_json_post_flow(
     assert "You have no registered grievances yet" in data["reply"]
 
 
+# ==============================================================================
+# 5. Webhook Signature Verification Security Tests
+# ==============================================================================
+
+
 @pytest.mark.asyncio
-async def test_twilio_get_webhook_simulation(client: AsyncClient) -> None:
+@patch.object(settings, "WHATSAPP_APP_SECRET", TEST_META_SECRET)
+async def test_meta_json_post_missing_signature_returns_403(client: AsyncClient) -> None:
+    """POST JSON with no X-Hub-Signature-256 header -> 403."""
+    payload = {"From": "919876540001", "Body": "hello"}
+    resp = await client.post(
+        "/api/v1/integrations/whatsapp/webhook",
+        json=payload,
+    )
+    assert resp.status_code == 403
+
+
+@pytest.mark.asyncio
+@patch.object(settings, "WHATSAPP_APP_SECRET", TEST_META_SECRET)
+async def test_meta_json_post_bad_signature_returns_403(client: AsyncClient) -> None:
+    """POST JSON with incorrect X-Hub-Signature-256 header -> 403."""
+    payload = {"From": "919876540001", "Body": "hello"}
+    resp = await client.post(
+        "/api/v1/integrations/whatsapp/webhook",
+        json=payload,
+        headers={"X-Hub-Signature-256": "sha256=deadbeef0000"},
+    )
+    assert resp.status_code == 403
+
+
+@pytest.mark.asyncio
+@patch.object(settings, "WHATSAPP_APP_SECRET", TEST_META_SECRET)
+async def test_meta_json_post_valid_signature_returns_200(client: AsyncClient) -> None:
+    """POST JSON with correct X-Hub-Signature-256 header -> 200."""
+    payload = {"From": "919876540001", "Body": "STATUS"}
+    raw_body = json.dumps(payload).encode("utf-8")
+    sig = _compute_meta_signature(raw_body)
+    resp = await client.post(
+        "/api/v1/integrations/whatsapp/webhook",
+        content=raw_body,
+        headers={
+            "Content-Type": "application/json",
+            "X-Hub-Signature-256": sig,
+        },
+    )
+    assert resp.status_code == 200
+
+
+@pytest.mark.asyncio
+@patch.object(settings, "TWILIO_AUTH_TOKEN", TEST_TWILIO_TOKEN)
+async def test_twilio_form_post_missing_signature_returns_403(client: AsyncClient) -> None:
+    """POST form data with no X-Twilio-Signature header -> 403."""
+    resp = await client.post(
+        "/api/v1/integrations/whatsapp/webhook",
+        data={"From": "whatsapp:+919876540001", "Body": "hello"},
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+    )
+    assert resp.status_code == 403
+
+
+@pytest.mark.asyncio
+@patch.object(settings, "TWILIO_AUTH_TOKEN", TEST_TWILIO_TOKEN)
+async def test_twilio_form_post_bad_signature_returns_403(client: AsyncClient) -> None:
+    """POST form data with incorrect X-Twilio-Signature -> 403."""
+    resp = await client.post(
+        "/api/v1/integrations/whatsapp/webhook",
+        data={"From": "whatsapp:+919876540001", "Body": "hello"},
+        headers={
+            "Content-Type": "application/x-www-form-urlencoded",
+            "X-Twilio-Signature": "badsignaturehere==",
+        },
+    )
+    assert resp.status_code == 403
+
+
+@pytest.mark.asyncio
+@patch.object(settings, "TWILIO_AUTH_TOKEN", TEST_TWILIO_TOKEN)
+async def test_twilio_form_post_valid_signature_returns_200(client: AsyncClient) -> None:
+    """POST form data with correct X-Twilio-Signature -> 200."""
+    base_url = "http://test/api/v1/integrations/whatsapp/webhook"
+    form_params = {"From": "whatsapp:+919876540001", "Body": "STATUS"}
+    sig = _compute_twilio_signature(base_url, form_params)
+
+    resp = await client.post(
+        "/api/v1/integrations/whatsapp/webhook",
+        data=form_params,
+        headers={
+            "Content-Type": "application/x-www-form-urlencoded",
+            "X-Twilio-Signature": sig,
+        },
+    )
+    assert resp.status_code == 200
+
+
+@pytest.mark.asyncio
+@patch.object(settings, "ENVIRONMENT", "production")
+@patch.object(settings, "WHATSAPP_APP_SECRET", None)
+async def test_production_no_secret_fails_closed_json(client: AsyncClient) -> None:
+    """In production, if WHATSAPP_APP_SECRET is not configured, reject with 403."""
+    payload = {"From": "919876540001", "Body": "hello"}
+    resp = await client.post(
+        "/api/v1/integrations/whatsapp/webhook",
+        json=payload,
+    )
+    assert resp.status_code == 403
+
+
+@pytest.mark.asyncio
+@patch.object(settings, "ENVIRONMENT", "production")
+@patch.object(settings, "TWILIO_AUTH_TOKEN", None)
+async def test_production_no_token_fails_closed_form(client: AsyncClient) -> None:
+    """In production, if TWILIO_AUTH_TOKEN is not configured, reject with 403."""
+    resp = await client.post(
+        "/api/v1/integrations/whatsapp/webhook",
+        data={"From": "whatsapp:+919876540001", "Body": "hello"},
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+    )
+    assert resp.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_get_webhook_no_longer_processes_messages(client: AsyncClient) -> None:
+    """GET with From/Body params should no longer process messages (Twilio GET removed)."""
     resp = await client.get(
         "/api/v1/integrations/whatsapp/webhook",
         params={
@@ -473,5 +665,7 @@ async def test_twilio_get_webhook_simulation(client: AsyncClient) -> None:
         },
     )
     assert resp.status_code == 200
-    assert "application/xml" in resp.headers.get("content-type", "")
-    assert "You have no registered grievances yet" in resp.text
+    # Should return the operational status, NOT process the message
+    data = resp.json()
+    assert data.get("status") == "ok"
+    assert "operational" in data.get("message", "").lower()

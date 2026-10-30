@@ -18,6 +18,7 @@ from app.core.middleware import (
     generic_exception_handler,
     validation_exception_handler,
 )
+from app.core.security_headers import SecurityHeadersMiddleware
 from app.db.session import engine, get_db
 from app.modules.activity.api import activity_router
 from app.modules.admin.api import chaos_router
@@ -47,16 +48,21 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     await engine.dispose()
 
 
+_is_production = settings.ENVIRONMENT.lower() == "production"
+
 app = FastAPI(
     title="AI-Powered Municipal Grievance Intelligence & Accountability System",
     description="Backend API for intelligent grievance triage, routing, and evidence-verified resolution.",
     version="0.1.0",
-    docs_url="/docs",
-    redoc_url="/redoc",
+    docs_url=None if _is_production else "/docs",
+    redoc_url=None if _is_production else "/redoc",
+    openapi_url=None if _is_production else "/openapi.json",
     lifespan=lifespan,
 )
 
 # Middleware (order matters: outermost first)
+app.add_middleware(SecurityHeadersMiddleware)
+
 # Rate limiting (Redis-backed, graceful degradation in dev/test)
 if settings.RATE_LIMIT_ENABLED:
     from app.core.rate_limit import RateLimitMiddleware

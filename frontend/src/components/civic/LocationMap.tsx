@@ -29,6 +29,79 @@ export function getDepartmentColor(deptOrCategory?: string): string {
   return "#64748b"; // Slate
 }
 
+/**
+ * Build a map pin element using safe DOM APIs only.
+ * Color must come from getDepartmentColor (allowlist).
+ */
+export function buildPinElement(color: string): HTMLElement {
+  const pin = document.createElement('div');
+  pin.style.cssText = `width:22px;height:22px;border-radius:50% 50% 50% 0;background-color:${color};transform:rotate(-45deg);border:2px solid #ffffff;box-shadow:0 2px 5px rgba(0,0,0,0.35);display:flex;align-items:center;justify-content:center;cursor:pointer;`;
+  const dot = document.createElement('div');
+  dot.style.cssText = 'width:7px;height:7px;border-radius:50%;background-color:#ffffff;transform:rotate(45deg);';
+  pin.appendChild(dot);
+  return pin;
+}
+
+/**
+ * Build popup content using safe DOM APIs — no innerHTML.
+ * All user-controlled strings are set via textContent to prevent XSS.
+ */
+export function buildPopupContent(
+  row: { id: string; title: string; department?: string; category?: string; address?: string; ward?: string; status: string },
+  color: string,
+): HTMLElement {
+  const wrapper = document.createElement('div');
+  wrapper.style.cssText = 'min-width:200px;font-family:inherit;';
+
+  const inner = document.createElement('div');
+  inner.style.padding = '2px';
+
+  // Department row
+  const deptRow = document.createElement('div');
+  deptRow.style.cssText = 'display:flex;align-items:center;gap:6px;margin-bottom:4px;';
+  const deptDot = document.createElement('span');
+  deptDot.style.cssText = `display:inline-block;width:8px;height:8px;border-radius:50%;background-color:${color};`;
+  const deptLabel = document.createElement('span');
+  deptLabel.style.cssText = `font-size:10px;font-weight:700;text-transform:uppercase;color:${color};letter-spacing:0.5px;`;
+  deptLabel.textContent = row.department || row.category || '';
+  deptRow.appendChild(deptDot);
+  deptRow.appendChild(deptLabel);
+
+  // Title
+  const titleEl = document.createElement('div');
+  titleEl.style.cssText = 'font-size:13px;font-weight:600;line-height:1.35;margin-bottom:4px;color:#0f172a;';
+  titleEl.textContent = row.title;
+
+  // Address / ward
+  const addressEl = document.createElement('div');
+  addressEl.style.cssText = 'font-size:11px;color:#64748b;margin-bottom:8px;';
+  addressEl.textContent = row.address || row.ward || '';
+
+  // Footer row
+  const footerRow = document.createElement('div');
+  footerRow.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:6px;border-top:1px solid #e2e8f0;padding-top:8px;';
+
+  const statusBadge = document.createElement('span');
+  statusBadge.style.cssText = 'font-size:10px;padding:2px 7px;border-radius:9999px;background:#f1f5f9;font-weight:600;color:#334155;text-transform:capitalize;';
+  statusBadge.textContent = row.status.replace('_', ' ');
+
+  const link = document.createElement('a');
+  link.href = `/complaints/${encodeURIComponent(String(row.id))}`;
+  link.style.cssText = 'font-size:11px;color:#2563eb;font-weight:600;text-decoration:none;';
+  link.textContent = 'View Details \u2192';
+
+  footerRow.appendChild(statusBadge);
+  footerRow.appendChild(link);
+
+  inner.appendChild(deptRow);
+  inner.appendChild(titleEl);
+  inner.appendChild(addressEl);
+  inner.appendChild(footerRow);
+  wrapper.appendChild(inner);
+
+  return wrapper;
+}
+
 interface Props {
   complaints?: Complaint[];
   lat?: number;
@@ -96,35 +169,14 @@ export default function LocationMap({
 
         displayedComplaints.forEach((row) => {
           if (!map || typeof row.lat !== 'number' || typeof row.lng !== 'number') return;
+          // Color comes from a fixed allowlist only — never from raw data
           const color = getDepartmentColor(row.department || row.category);
 
-          const pinHtml = `
-            <div style="
-              width: 22px;
-              height: 22px;
-              border-radius: 50% 50% 50% 0;
-              background-color: ${color};
-              transform: rotate(-45deg);
-              border: 2px solid #ffffff;
-              box-shadow: 0 2px 5px rgba(0,0,0,0.35);
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              cursor: pointer;
-            ">
-              <div style="
-                width: 7px;
-                height: 7px;
-                border-radius: 50%;
-                background-color: #ffffff;
-                transform: rotate(45deg);
-              "></div>
-            </div>
-          `;
+          const pinEl = buildPinElement(color);
 
           const customIcon = L.divIcon({
             className: 'civic-dynamic-pin',
-            html: pinHtml,
+            html: pinEl,
             iconSize: [22, 22],
             iconAnchor: [11, 22],
             popupAnchor: [0, -22],
@@ -133,23 +185,8 @@ export default function LocationMap({
           const marker = L.marker([row.lat, row.lng], { icon: customIcon }).addTo(map);
           bounds.extend([row.lat, row.lng]);
 
-          const popupContent = document.createElement('div');
-          popupContent.style.minWidth = '200px';
-          popupContent.style.fontFamily = 'inherit';
-          popupContent.innerHTML = `
-            <div style="padding: 2px;">
-              <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 4px;">
-                <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background-color: ${color};"></span>
-                <span style="font-size: 10px; font-weight: 700; text-transform: uppercase; color: ${color}; letter-spacing: 0.5px;">${row.department || row.category}</span>
-              </div>
-              <div style="font-size: 13px; font-weight: 600; line-height: 1.35; margin-bottom: 4px; color: #0f172a;">${row.title}</div>
-              <div style="font-size: 11px; color: #64748b; margin-bottom: 8px;">${row.address || row.ward || ''}</div>
-              <div style="display: flex; align-items: center; justify-content: space-between; gap: 6px; border-top: 1px solid #e2e8f0; padding-top: 8px;">
-                <span style="font-size: 10px; padding: 2px 7px; border-radius: 9999px; background: #f1f5f9; font-weight: 600; color: #334155; text-transform: capitalize;">${row.status.replace('_', ' ')}</span>
-                <a href="/complaints/${row.id}" style="font-size: 11px; color: #2563eb; font-weight: 600; text-decoration: none;">View Details &rarr;</a>
-              </div>
-            </div>
-          `;
+          // Build popup content safely with DOM APIs — no innerHTML
+          const popupContent = buildPopupContent(row, color);
           marker.bindPopup(popupContent);
         });
 
@@ -158,31 +195,10 @@ export default function LocationMap({
         }
       } else {
         const defaultColor = getDepartmentColor();
-        const pinHtml = `
-          <div style="
-            width: 22px;
-            height: 22px;
-            border-radius: 50% 50% 50% 0;
-            background-color: ${defaultColor};
-            transform: rotate(-45deg);
-            border: 2px solid #ffffff;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.35);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-          ">
-            <div style="
-              width: 7px;
-              height: 7px;
-              border-radius: 50%;
-              background-color: #ffffff;
-              transform: rotate(45deg);
-            "></div>
-          </div>
-        `;
+        const defaultPinEl = buildPinElement(defaultColor);
         const icon = L.divIcon({
           className: 'civic-dynamic-pin',
-          html: pinHtml,
+          html: defaultPinEl,
           iconSize: [22, 22],
           iconAnchor: [11, 22],
           popupAnchor: [0, -22],

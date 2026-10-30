@@ -1,5 +1,9 @@
+import hashlib
+import hmac
 import logging
+from base64 import b64encode
 from typing import Any, Optional
+from urllib.parse import urlencode
 from xml.sax.saxutils import escape
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
@@ -28,59 +32,131 @@ def _build_twiml_response(message: str) -> Response:
     return Response(content=xml_content, media_type="application/xml")
 
 
-@whatsapp_router.get("/webhook", summary="WhatsApp / Meta Hub Verification & Twilio GET Webhook")
+def _is_production() -> bool:
+    return settings.ENVIRONMENT.lower() == "production"
+
+
+def _signature_verification_required() -> bool:
+    """Return True if webhook signature verification must be enforced."""
+    if _is_production():
+        return True
+    return settings.WHATSAPP_SIGNATURE_REQUIRED
+
+
+def _verify_meta_signature(raw_body: bytes, signature_header: str | None) -> bool:
+    """Verify X-Hub-Signature-256 header for Meta/JSON webhooks.
+
+    Returns True if the signature is valid.
+    Raises HTTPException(403) on failure.
+    """
+    secret = settings.WHATSAPP_APP_SECRET
+    if not secret:
+        if _is_production():
+            logger.error("WHATSAPP_APP_SECRET is not configured in production — rejecting request.")
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Webhook signature verification not configured.",
+            )
+        if not _signature_verification_required():
+            return True
+        logger.error("WHATSAPP_APP_SECRET is not configured and signature is required.")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Webhook signature verification not configured.",
+        )
+
+    if not signature_header:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Missing X-Hub-Signature-256 header.",
+        )
+
+    if not signature_header.startswith("sha256="):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Invalid signature format.",
+        )
+
+    expected_sig = signature_header[len("sha256=") :]
+    computed_sig = hmac.new(secret.encode("utf-8"), raw_body, hashlib.sha256).hexdigest()
+
+    if not hmac.compare_digest(computed_sig, expected_sig):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Invalid webhook signature.",
+        )
+    return True
+
+
+def _verify_twilio_signature(
+    request_url: str, form_params: dict[str, str], signature_header: str | None
+) -> bool:
+    """Verify X-Twilio-Signature header for Twilio form webhooks.
+
+    Twilio signs: URL + sorted(param keys) with values concatenated, HMAC-SHA1, base64.
+    """
+    token = settings.TWILIO_AUTH_TOKEN
+    if not token:
+        if _is_production():
+            logger.error("TWILIO_AUTH_TOKEN is not configured in production — rejecting request.")
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Webhook signature verification not configured.",
+            )
+        if not _signature_verification_required():
+            return True
+        logger.error("TWILIO_AUTH_TOKEN is not configured and signature is required.")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Webhook signature verification not configured.",
+        )
+
+    if not signature_header:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Missing X-Twilio-Signature header.",
+        )
+
+    # Build the data string: URL + sorted param key-value pairs concatenated
+    data_str = request_url
+    for key in sorted(form_params.keys()):
+        data_str += key + form_params[key]
+
+    computed_sig = b64encode(
+        hmac.new(token.encode("utf-8"), data_str.encode("utf-8"), hashlib.sha1).digest()
+    ).decode("utf-8")
+
+    if not hmac.compare_digest(computed_sig, signature_header):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Invalid webhook signature.",
+        )
+    return True
+
+
+@whatsapp_router.get("/webhook", summary="WhatsApp / Meta Hub Verification")
 async def verify_or_handle_get(
     request: Request,
     hub_mode: Optional[str] = Query(None, alias="hub.mode"),
     hub_challenge: Optional[str] = Query(None, alias="hub.challenge"),
     hub_verify_token: Optional[str] = Query(None, alias="hub.verify_token"),
-    # Query parameters for Twilio GET compatibility
-    from_number: Optional[str] = Query(None, alias="From"),
-    body: Optional[str] = Query(None, alias="Body"),
-    latitude: Optional[float] = Query(None, alias="Latitude"),
-    longitude: Optional[float] = Query(None, alias="Longitude"),
-    media_url: Optional[str] = Query(None, alias="MediaUrl0"),
-    media_content_type: Optional[str] = Query(None, alias="MediaContentType0"),
-    db_session: AsyncSession = Depends(get_db),
 ) -> Response:
     """
-    Handles:
-    1. Meta WhatsApp Cloud API Webhook Verification (hub.mode, hub.challenge, hub.verify_token).
-    2. Twilio Webhook GET queries (From, Body, Latitude, Longitude, MediaUrl0).
+    Handles Meta WhatsApp Cloud API Webhook Verification only.
+    GET-based message processing is no longer supported for security.
     """
-    # 1. Meta Webhook Verification challenge
+    # Meta Webhook Verification challenge
     if hub_mode:
-        if hub_mode == "subscribe" and hub_verify_token == settings.WHATSAPP_VERIFY_TOKEN:
+        if hub_mode == "subscribe" and hub_verify_token is not None and hmac.compare_digest(
+            hub_verify_token, settings.WHATSAPP_VERIFY_TOKEN
+        ):
             logger.info("Meta WhatsApp Cloud API webhook verified successfully.")
             return PlainTextResponse(content=hub_challenge or "", status_code=status.HTTP_200_OK)
-        logger.warning(
-            "Meta webhook verification failed: mode=%s, token=%s", hub_mode, hub_verify_token
-        )
+        logger.warning("Meta webhook verification failed: mode=%s", hub_mode)
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Verification token mismatch or invalid mode.",
         )
-
-    # 2. Twilio GET Webhook simulation
-    if from_number:
-        try:
-            user = await resolve_or_create_whatsapp_citizen(db_session, from_number)
-            inbound = WhatsAppInboundMessage(
-                sender_phone=normalize_phone_number(from_number),
-                body=body,
-                latitude=latitude,
-                longitude=longitude,
-                media_url=media_url,
-                media_content_type=media_content_type,
-            )
-            service = WhatsAppService(db_session)
-            reply_text = await service.process_inbound_message(user, inbound)
-            return _build_twiml_response(reply_text)
-        except Exception as exc:
-            logger.exception("Error processing Twilio GET webhook: %s", exc)
-            return _build_twiml_response(
-                "An error occurred while processing your request. Please try again."
-            )
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
@@ -97,19 +173,40 @@ async def handle_whatsapp_post(
     Handles incoming citizen messages asynchronously. Compatible with:
     - Twilio Webhook payloads (application/x-www-form-urlencoded / multipart/form-data)
     - Meta WhatsApp Cloud API payloads (application/json)
+
+    Signature verification is performed BEFORE any parsing, user resolution or DB writes.
     """
     content_type = request.headers.get("content-type", "").lower()
+    is_form_request = (
+        "application/x-www-form-urlencoded" in content_type
+        or "multipart/form-data" in content_type
+    )
+
+    # ── Signature verification (BEFORE any parsing) ──────────────────────
+    raw_body = await request.body()
+
+    if is_form_request:
+        # Twilio-style form request → verify X-Twilio-Signature
+        form_data = await request.form()
+        form_params: dict[str, str] = {k: str(v) for k, v in form_data.items()}
+        request_url = str(request.url)
+        twilio_sig = request.headers.get("X-Twilio-Signature")
+        _verify_twilio_signature(request_url, form_params, twilio_sig)
+    else:
+        # JSON/Meta request → verify X-Hub-Signature-256
+        meta_sig = request.headers.get("X-Hub-Signature-256")
+        _verify_meta_signature(raw_body, meta_sig)
+
+    # ── Parse the verified payload ───────────────────────────────────────
     sender_phone: Optional[str] = None
     body_text: Optional[str] = None
     lat: Optional[float] = None
     lon: Optional[float] = None
     media_url: Optional[str] = None
     media_content_type: Optional[str] = None
-    is_form_request = False
-
     message_id: Optional[str] = None
-    if "application/x-www-form-urlencoded" in content_type or "multipart/form-data" in content_type:
-        is_form_request = True
+
+    if is_form_request:
         form_data = await request.form()
         sender_phone = str(form_data.get("From") or "")
         body_text = str(form_data.get("Body") or "") if form_data.get("Body") else None
