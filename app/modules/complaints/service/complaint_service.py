@@ -1,13 +1,17 @@
 import hashlib
+import logging
 import os
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 from fastapi import UploadFile
 from shapely.geometry import Point, shape
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+
+logger = logging.getLogger("app.complaints.service")
 
 from app.config import settings
 from app.core.errors import BadRequestError, ForbiddenError, NotFoundError
@@ -166,12 +170,40 @@ class ComplaintService:
         )
         now = datetime.now(timezone.utc)
         responses: list[ComplaintResponse] = []
+        # Batch fetch latest AI interpretations to return zero-shot BART response to officers
+        ai_data_map: dict[uuid.UUID, dict[str, Any]] = {}
+        if items:
+            complaint_ids = [r.complaint.id for r in items]
+            try:
+                from app.modules.ai_assist.models.ai_interpretation import AIInterpretation
+                from sqlalchemy import desc
+
+                interp_stmt = (
+                    select(AIInterpretation)
+                    .where(AIInterpretation.complaint_id.in_(complaint_ids))
+                    .order_by(AIInterpretation.complaint_id, desc(AIInterpretation.created_at))
+                )
+                interp_rows = (await self.session.execute(interp_stmt)).scalars().all()
+                for interp in interp_rows:
+                    if interp.complaint_id not in ai_data_map:
+                        parsed = interp.parsed_output or {}
+                        ai_data_map[interp.complaint_id] = {
+                            "ai_dept_scores": parsed.get("dept_scores"),
+                            "ai_summary": parsed.get("ai_summary"),
+                            "ai_model": interp.model or parsed.get("external_ml_model"),
+                            "is_duplicate": parsed.get("is_duplicate"),
+                            "duplicate_similarity": parsed.get("similarity_score"),
+                        }
+            except Exception as e:
+                logger.warning("Could not batch load AI interpretations for complaints: %s", e)
+
         for record in items:
             deadline = calculate_sla_deadline(
                 record.priority_band,
                 record.complaint.created_at,
                 record.suggested_sla_hours,
             )
+            ai_data = ai_data_map.get(record.complaint.id, {})
             responses.append(
                 ComplaintResponse.model_validate(record.complaint).model_copy(
                     update={
@@ -184,6 +216,11 @@ class ComplaintService:
                         "department_id": record.department_id,
                         "department_name": record.department_name,
                         "ward_number": record.ward_number,
+                        "ai_dept_scores": ai_data.get("ai_dept_scores"),
+                        "ai_summary": ai_data.get("ai_summary"),
+                        "ai_model": ai_data.get("ai_model"),
+                        "is_duplicate": ai_data.get("is_duplicate"),
+                        "duplicate_similarity": ai_data.get("duplicate_similarity"),
                     }
                 )
             )

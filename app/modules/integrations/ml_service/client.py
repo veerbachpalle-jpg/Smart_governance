@@ -46,7 +46,10 @@ class MLComplaintClient:
         timeout: Optional[float] = None,
         enabled: Optional[bool] = None,
     ) -> None:
-        self.base_url = (base_url or settings.EXTERNAL_ML_API_URL).rstrip("/")
+        raw_url = (base_url or settings.EXTERNAL_ML_API_URL).rstrip("/")
+        if raw_url.endswith("/complaints"):
+            raw_url = raw_url[:-11].rstrip("/")
+        self.base_url = raw_url
         self.timeout = timeout or settings.EXTERNAL_ML_API_TIMEOUT
         self.enabled = enabled if enabled is not None else settings.EXTERNAL_ML_API_ENABLED
 

@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from typing import Literal
+from typing import Any, Dict, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -58,6 +58,11 @@ class ComplaintResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     attachments: list[AttachmentResponse] = Field(default_factory=list)
+    ai_dept_scores: list[dict[str, Any]] | None = None
+    ai_summary: str | None = None
+    ai_model: str | None = None
+    is_duplicate: bool | None = None
+    duplicate_similarity: float | None = None
 
     model_config = ConfigDict(from_attributes=True)
 

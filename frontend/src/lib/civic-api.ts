@@ -205,6 +205,11 @@ interface BackendComplaint {
   department_name: string | null;
   department_id: string | null;
   ward_number: number | null;
+  ai_dept_scores?: Array<{ department: string; confidence: number }> | null;
+  ai_summary?: string | null;
+  ai_model?: string | null;
+  is_duplicate?: boolean | null;
+  duplicate_similarity?: number | null;
 }
 
 export interface MunicipalDepartment {
@@ -331,6 +336,11 @@ function toComplaint(row: BackendComplaint): Complaint {
       },
     ],
     language: row.original_language,
+    ...(row.ai_dept_scores ? { aiDeptScores: row.ai_dept_scores } : {}),
+    ...(row.ai_summary ? { aiSummary: row.ai_summary } : {}),
+    ...(row.ai_model ? { aiModel: row.ai_model } : {}),
+    ...(row.is_duplicate !== undefined && row.is_duplicate !== null ? { isDuplicate: row.is_duplicate } : {}),
+    ...(row.duplicate_similarity !== undefined && row.duplicate_similarity !== null ? { duplicateSimilarity: row.duplicate_similarity } : {}),
   };
 }
 

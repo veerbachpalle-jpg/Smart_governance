@@ -65,7 +65,7 @@ class Settings(BaseSettings):
     AI_CIRCUIT_BREAKER_RESET_SECONDS: float = Field(default=60.0)
 
     # External AI Complaint Management API (facebook/bart-large-mnli & all-MiniLM-L6-v2)
-    EXTERNAL_ML_API_URL: str = Field(default="http://localhost:8000")
+    EXTERNAL_ML_API_URL: str = Field(default="http://10.192.26.166:8000")
     EXTERNAL_ML_API_TIMEOUT: float = Field(default=35.0)
     EXTERNAL_ML_API_ENABLED: bool = Field(default=True)
 
