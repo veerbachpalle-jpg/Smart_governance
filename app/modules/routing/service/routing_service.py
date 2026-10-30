@@ -116,9 +116,11 @@ class RoutingService:
         return [RoutingRuleResponse.model_validate(r) for r in rules]
 
     async def generate_routing_recommendation(
-        self, complaint_id: uuid.UUID
+        self,
+        complaint_id: uuid.UUID,
+        ml_dept_scores: list[dict[str, Any]] | None = None,
     ) -> RoutingRecommendationResponse:
-        """Generates ranked top-3 department routing recommendations using active rules and heuristics."""
+        """Generates ranked top-3 department routing recommendations using zero-shot ML scores, active rules, and heuristics."""
         complaint = await self.complaint_repo.get_by_id(complaint_id)
         if not complaint:
             raise NotFoundError(
@@ -242,7 +244,69 @@ class RoutingService:
         rule_version_used: int | None = None
         primary_dept: Department
 
-        if matching_rules:
+        # 2a. Check if zero-shot ML scores were passed or stored in AIInterpretation
+        if ml_dept_scores is None:
+            try:
+                from app.modules.ai_assist.repository.ai_repository import AIInterpretationRepository
+
+                ai_repo = AIInterpretationRepository(self.session)
+                interp = await ai_repo.get_latest_by_complaint_id(complaint.id)
+                if interp and interp.parsed_output and isinstance(interp.parsed_output, dict):
+                    ml_dept_scores = interp.parsed_output.get("dept_scores")
+            except Exception:
+                ml_dept_scores = None
+
+        if ml_dept_scores and isinstance(ml_dept_scores, list) and len(ml_dept_scores) > 0:
+            dept_map: dict[str, Department] = {}
+            for d in all_depts:
+                code_lower = d.code.lower()
+                name_lower = d.name.lower()
+                for key, mapped_code in [
+                    ("roads", "road"),
+                    ("water", "water"),
+                    ("electricity", "elec"),
+                    ("sanitation", "san"),
+                    ("drainage", "drain"),
+                    ("parks", "park"),
+                ]:
+                    if mapped_code in code_lower or mapped_code in name_lower:
+                        dept_map[key] = d
+
+            sorted_scores = sorted(
+                ml_dept_scores,
+                key=lambda x: float(x.get("confidence", 0.0) if isinstance(x, dict) else getattr(x, "confidence", 0.0)),
+                reverse=True,
+            )
+            top_ranked = []
+            for item in sorted_scores:
+                d_name = item.get("department") if isinstance(item, dict) else getattr(item, "department", "")
+                d_conf = float(item.get("confidence", 0.0) if isinstance(item, dict) else getattr(item, "confidence", 0.0))
+                matched_dept = dept_map.get(str(d_name).lower())
+                if matched_dept and matched_dept not in [r[0] for r in top_ranked]:
+                    top_ranked.append((matched_dept, d_conf, d_name))
+
+            if top_ranked:
+                primary_dept = top_ranked[0][0]
+                confidence = round(top_ranked[0][1], 2)
+                ranked.append(
+                    {
+                        "department_id": str(primary_dept.id),
+                        "department_name": primary_dept.name,
+                        "confidence": confidence,
+                        "reasons": [f"Zero-shot classifier ({top_ranked[0][2]}: {confidence:.0%})"],
+                    }
+                )
+                for dept_obj, conf_val, ext_name in top_ranked[1:3]:
+                    ranked.append(
+                        {
+                            "department_id": str(dept_obj.id),
+                            "department_name": dept_obj.name,
+                            "confidence": round(conf_val, 2),
+                            "reasons": [f"Secondary zero-shot candidate ({ext_name}: {round(conf_val, 2):.0%})"],
+                        }
+                    )
+
+        if not ranked and matching_rules:
             best_rule = matching_rules[0]
             rule_version_used = best_rule.rule_version
             primary_dept = best_rule.department
@@ -258,7 +322,7 @@ class RoutingService:
                     "reasons": [reason],
                 }
             )
-        else:
+        elif not ranked:
             # Fallback heuristic mapping
             def find_dept_by_keyword(kw: str) -> Department:
                 for d in all_depts:
@@ -289,18 +353,27 @@ class RoutingService:
                 }
             )
 
-        # Fill top-2 and top-3 with other departments
-        other_depts = [d for d in all_depts if d.id != primary_dept.id]
-        if other_depts:
-            ranked.append(
-                {
-                    "department_id": str(other_depts[0].id),
-                    "department_name": other_depts[0].name,
-                    "confidence": round(confidence * 0.7, 2),
-                    "reasons": ["Secondary department with potential co-jurisdiction"],
-                }
-            )
-        if len(other_depts) > 1:
+        # Fill top-2 and top-3 with other departments if not already filled
+        if len(ranked) < 2:
+            other_depts = [d for d in all_depts if d.id != primary_dept.id]
+            if other_depts:
+                ranked.append(
+                    {
+                        "department_id": str(other_depts[0].id),
+                        "department_name": other_depts[0].name,
+                        "confidence": round(confidence * 0.7, 2),
+                        "reasons": ["Secondary department with potential co-jurisdiction"],
+                    }
+                )
+            if len(other_depts) > 1:
+                ranked.append(
+                    {
+                        "department_id": str(other_depts[1].id),
+                        "department_name": other_depts[1].name,
+                        "confidence": round(confidence * 0.4, 2),
+                        "reasons": ["Tertiary department candidate"],
+                    }
+                )
             ranked.append(
                 {
                     "department_id": str(other_depts[1].id),

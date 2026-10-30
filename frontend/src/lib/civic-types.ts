@@ -47,6 +47,11 @@ export interface Complaint {
   departmentConfirmed?: boolean;
   priorityConfirmed?: boolean;
   assignedOfficer?: string;
+  aiDeptScores?: Array<{ department: string; confidence: number }>;
+  aiSummary?: string;
+  aiModel?: string;
+  isDuplicate?: boolean;
+  duplicateSimilarity?: number;
 }
 export interface TrendingIssue {
   id: string;

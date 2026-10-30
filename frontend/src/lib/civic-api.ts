@@ -781,4 +781,42 @@ export const civicApi = {
       "transition",
     );
   },
+  async checkMLHealth(): Promise<{ connected: boolean; url: string; model?: string; status?: string }> {
+    if (isDemo) {
+      return { connected: true, url: "http://localhost:8000", model: "facebook/bart-large-mnli", status: "healthy" };
+    }
+    try {
+      return await request("/integrations/ml-service/health");
+    } catch {
+      return { connected: false, url: "http://localhost:8000", status: "offline" };
+    }
+  },
+  async analyzeMLDryRun(complaintText: string): Promise<any> {
+    if (isDemo) {
+      return {
+        success: true,
+        complaint_id: 999,
+        ai_analysis: {
+          departments: ["Roads"],
+          dept_scores: [
+            { department: "Roads", confidence: 0.97 },
+            { department: "Drainage", confidence: 0.05 },
+            { department: "Water", confidence: 0.02 },
+            { department: "Sanitation", confidence: 0.01 },
+            { department: "Electricity", confidence: 0.01 },
+            { department: "Parks", confidence: 0.01 },
+          ],
+          ai_confidence: 0.97,
+          priority: "High",
+          ai_summary: `[Roads] ${complaintText}`,
+          is_duplicate: false,
+        },
+      };
+    }
+    return request("/integrations/ml-service/analyze", {
+      method: "POST",
+      body: JSON.stringify({ complaint_text: complaintText }),
+    });
+  },
 };
+

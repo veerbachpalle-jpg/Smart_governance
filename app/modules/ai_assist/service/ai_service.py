@@ -161,8 +161,48 @@ class AIAssistService:
             validated_dict = validate_root_cause_guardrail(parsed_dict)
             confidence = float(validated_dict.get("confidence", 0.0))
 
+            # 6b. External AI Complaint Management API (facebook/bart-large-mnli & all-MiniLM-L6-v2)
+            ml_analysis_dict: dict[str, Any] | None = None
+            if settings.EXTERNAL_ML_API_ENABLED:
+                try:
+                    from app.modules.identity.models.user import User
+                    from app.modules.integrations.ml_service.client import ml_client
+
+                    citizen_user = await self.session.get(User, complaint.citizen_id)
+                    ml_res = await ml_client.analyze_complaint(
+                        citizen_name=citizen_user.full_name if citizen_user else "Citizen",
+                        contact=citizen_user.phone_number if citizen_user else "9999999999",
+                        location=complaint.address or complaint.ward_name or "City Municipal Area",
+                        complaint_text=f"{working_title}. {working_desc}",
+                        category=validated_dict.get("category") or "General Grievance",
+                    )
+                    if ml_res and ml_res.ai_analysis:
+                        ml_analysis_dict = ml_res.ai_analysis.model_dump()
+                        validated_dict["dept_scores"] = [
+                            s.model_dump() if hasattr(s, "model_dump") else s
+                            for s in ml_res.ai_analysis.dept_scores
+                        ]
+                        validated_dict["departments"] = ml_res.ai_analysis.departments
+                        validated_dict["ai_summary"] = ml_res.ai_analysis.ai_summary
+                        validated_dict["similarity_score"] = ml_res.ai_analysis.similarity_score
+                        validated_dict["is_duplicate"] = ml_res.ai_analysis.is_duplicate
+                        validated_dict["duplicate_of"] = ml_res.ai_analysis.duplicate_of
+                        validated_dict["ml_priority"] = ml_res.ai_analysis.priority
+                        validated_dict["external_ml_model"] = "facebook/bart-large-mnli"
+                        ml_conf = float(ml_res.ai_analysis.ai_confidence or 0.0)
+                        if ml_conf > confidence:
+                            confidence = ml_conf
+                except Exception as ml_err:
+                    logger.warning("External ML service call failed gracefully: %s", ml_err)
+
             latency_ms = int((time.monotonic() - start_time) * 1000)
             ai_circuit_breaker.record_success()
+
+            model_name = (
+                "facebook/bart-large-mnli"
+                if ml_analysis_dict
+                else (settings.GEMINI_MODEL if settings.GEMINI_API_KEY else "mock-keyword-provider")
+            )
 
             # 7. Confidence check: low confidence degrades to MANUAL_TRIAGE
             if confidence < settings.AI_CONFIDENCE_THRESHOLD:
@@ -175,9 +215,7 @@ class AIAssistService:
                 complaint.status = "MANUAL_TRIAGE"
                 interpretation_rec = AIInterpretation(
                     complaint_id=complaint.id,
-                    model=settings.GEMINI_MODEL
-                    if settings.GEMINI_API_KEY
-                    else "mock-keyword-provider",
+                    model=model_name,
                     prompt_version=prompt_version,
                     input_hash=input_hash,
                     raw_output=json.dumps(validated_dict),
@@ -203,7 +241,7 @@ class AIAssistService:
             complaint.status = "TRIAGE_REVIEW"
             interpretation_rec = AIInterpretation(
                 complaint_id=complaint.id,
-                model=settings.GEMINI_MODEL if settings.GEMINI_API_KEY else "mock-keyword-provider",
+                model=model_name,
                 prompt_version=prompt_version,
                 input_hash=input_hash,
                 raw_output=json.dumps(validated_dict),
@@ -231,14 +269,32 @@ class AIAssistService:
             try:
                 from app.modules.routing.service.routing_service import RoutingService
 
-                await RoutingService(self.session).generate_routing_recommendation(complaint.id)
+                ml_scores = (
+                    validated_dict.get("dept_scores")
+                    if ml_analysis_dict
+                    else None
+                )
+                await RoutingService(self.session).generate_routing_recommendation(
+                    complaint.id,
+                    ml_dept_scores=ml_scores,
+                )
             except Exception as r_err:
                 logger.warning("Downstream routing generation failed: %s", r_err)
 
             try:
                 from app.modules.priority.service.priority_service import PriorityService
 
-                await PriorityService(self.session).assess_priority(complaint.id)
+                model_pri = "MEDIUM"
+                if ml_analysis_dict and ml_analysis_dict.get("priority"):
+                    pri_raw = str(ml_analysis_dict["priority"]).upper()
+                    if pri_raw in {"LOW", "MEDIUM", "HIGH", "CRITICAL"}:
+                        model_pri = pri_raw
+
+                await PriorityService(self.session).assess_priority(
+                    complaint.id,
+                    model_priority_hint=model_pri,
+                    model_confidence=confidence,
+                )
             except Exception as p_err:
                 logger.warning("Downstream priority assessment failed: %s", p_err)
 
