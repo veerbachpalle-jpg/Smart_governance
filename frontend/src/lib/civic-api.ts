@@ -138,7 +138,8 @@ export async function request<T>(
   let response: Response;
   try {
     response = await fetch(`${base}${path}`, { ...options, headers });
-  } catch {
+  } catch (fetchErr) {
+    console.error("Municipal API request failed:", fetchErr, "Target URL:", `${base}${path}`);
     throw new ApiError(
       "Connection lost. Your draft is safe. Check your connection and try again.",
       0,
