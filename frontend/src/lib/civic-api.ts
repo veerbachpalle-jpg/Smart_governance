@@ -651,13 +651,51 @@ export const civicApi = {
           await request(`/cases/${caseId}/assign`, { method: "POST", body: JSON.stringify(changes) });
           break;
         case "reassign":
+        case "request-department-change":
           await request(`/cases/${caseId}/reassign`, {
             method: "POST",
             body: JSON.stringify({
-              reason: changes.activity?.[0]?.note || "Reassignment requested",
+              reason: (changes as any).departmentChangeRequest?.reason || changes.activity?.[0]?.note || "Reassignment requested",
             }),
           });
           break;
+        case "approve-department-change": {
+          const targetDept = changes.department || (changes as any).departmentChangeRequest?.requestedDepartment;
+          if (targetDept) {
+            try {
+              await request(`/cases/${caseId}/lead`, {
+                method: "PUT",
+                body: JSON.stringify({ lead_department_name: targetDept, reason: "Supervisor approved department reassignment" }),
+              });
+            } catch {
+              // fallback
+            }
+          }
+          break;
+        }
+        case "override-priority":
+        case "approve-priority-change": {
+          const targetPrio = (changes as any).priorityBand || (changes.priority === "Critical" ? "CRITICAL" : changes.priority === "High" ? "HIGH" : "MEDIUM");
+          await request(`/complaints/${row.backendId}/priority/override`, {
+            method: "POST",
+            body: JSON.stringify({
+              priority: targetPrio,
+              reason: changes.activity?.[0]?.note || "Supervisor approved priority change",
+            }),
+          });
+          break;
+        }
+        case "update-condition": {
+          const conditionText = `Condition status updated to ${((changes as any).conditionStatus || '').replaceAll('_', ' ')}: ${(changes as any).conditionNote || 'Inspection recorded'}`;
+          await request(`/cases/${caseId}/activity`, {
+            method: "POST",
+            body: JSON.stringify({
+              note: conditionText,
+              is_citizen_visible: true,
+            }),
+          });
+          break;
+        }
         default:
           break;
       }
@@ -690,6 +728,64 @@ export const civicApi = {
         public: true,
       };
       finalChanges.activity = [reopenAct, ...(row.activity || [])];
+    } else if (action === "request-department-change") {
+      finalChanges.departmentChangeRequest = {
+        ...(changes as any).departmentChangeRequest,
+        status: "PENDING",
+      };
+      if (changes.activity) {
+        finalChanges.activity = changes.activity;
+      }
+    } else if (action === "approve-department-change") {
+      finalChanges.department = changes.department || row.departmentChangeRequest?.requestedDepartment || row.department;
+      finalChanges.departmentChangeRequest = {
+        ...(row.departmentChangeRequest || {}),
+        status: "APPROVED",
+      };
+      if (changes.activity) {
+        finalChanges.activity = changes.activity;
+      }
+    } else if (action === "reject-department-change") {
+      finalChanges.departmentChangeRequest = {
+        ...(row.departmentChangeRequest || {}),
+        status: "REJECTED",
+      };
+      if (changes.activity) {
+        finalChanges.activity = changes.activity;
+      }
+    } else if (action === "request-priority-change") {
+      finalChanges.priorityChangeRequest = {
+        ...(changes as any).priorityChangeRequest,
+        status: "PENDING",
+      };
+      if (changes.activity) {
+        finalChanges.activity = changes.activity;
+      }
+    } else if (action === "approve-priority-change") {
+      const p = (changes as any).priority || (row.priorityChangeRequest?.requestedPriority === "CRITICAL" ? "Critical" : row.priorityChangeRequest?.requestedPriority === "HIGH" ? "High" : "Normal");
+      finalChanges.priority = p;
+      finalChanges.priorityBand = (changes as any).priorityBand || row.priorityChangeRequest?.requestedPriority || "MEDIUM";
+      finalChanges.priorityChangeRequest = {
+        ...(row.priorityChangeRequest || {}),
+        status: "APPROVED",
+      };
+      if (changes.activity) {
+        finalChanges.activity = changes.activity;
+      }
+    } else if (action === "reject-priority-change") {
+      finalChanges.priorityChangeRequest = {
+        ...(row.priorityChangeRequest || {}),
+        status: "REJECTED",
+      };
+      if (changes.activity) {
+        finalChanges.activity = changes.activity;
+      }
+    } else if (action === "update-condition") {
+      finalChanges.conditionStatus = (changes as any).conditionStatus;
+      finalChanges.conditionNote = (changes as any).conditionNote;
+      if (changes.activity) {
+        finalChanges.activity = changes.activity;
+      }
     }
     const next = { ...row, ...finalChanges };
     demoRows = demoRows.map((item) => (item.id === id ? next : item));

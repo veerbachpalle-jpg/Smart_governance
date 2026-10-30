@@ -52,6 +52,22 @@ export interface Complaint {
   aiModel?: string;
   isDuplicate?: boolean;
   duplicateSimilarity?: number;
+  conditionStatus?: "pending_inspection" | "in_repair" | "material_procurement" | "contractor_assigned" | "temporarily_mitigated" | "completed";
+  conditionNote?: string;
+  departmentChangeRequest?: {
+    requestedDepartment: string;
+    reason: string;
+    status: "PENDING" | "APPROVED" | "REJECTED";
+    requestedBy: string;
+    requestedAt: string;
+  };
+  priorityChangeRequest?: {
+    requestedPriority: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+    reason: string;
+    status: "PENDING" | "APPROVED" | "REJECTED";
+    requestedBy: string;
+    requestedAt: string;
+  };
 }
 export interface TrendingIssue {
   id: string;
